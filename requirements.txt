@@ -1,0 +1,10 @@
+aiogram==2.25.1
+aiosqlite==0.19.0
+telethon==1.33.1
+
+# aiohttp и его зависимости — стабильные версии с готовыми колёсами
+aiohttp==3.8.6
+yarl==1.9.2
+frozenlist==1.4.0
+multidict==6.0.4
+attrs==23.1.0
