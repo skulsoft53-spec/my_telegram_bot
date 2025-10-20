@@ -56,7 +56,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text(response)
 
 def main():
-    BOT_TOKEN = os.environ.get("8456574639:AAHkzT7WvLNB9JYYB1baBLVf9A_DjVgNvmM")
+    BOT_TOKEN = os.environ.get("8456574639:AAH29cxmqD-aQxHRZFZijYBaqjRWbiAEM_w")
     if not BOT_TOKEN:
         print("❌ Ошибка: переменная BOT_TOKEN не найдена.")
         return
