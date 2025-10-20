@@ -5,11 +5,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
-# Проверка токена
+# Получаем токен из переменной окружения
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-if not TELEGRAM_TOKEN:
-    raise RuntimeError("Ошибка: переменная окружения TELEGRAM_TOKEN не установлена!")
-print("✅ TELEGRAM_TOKEN найден, бот запускается...")
+if TELEGRAM_TOKEN:
+    print("✅ TELEGRAM_TOKEN найден, бот запускается...")
+else:
+    print("⚠️ TELEGRAM_TOKEN не найден. Telegram бот не будет работать, только веб-сервер.")
 
 # Пользователи, на которых бот отвечает
 TARGET_USERNAMES = ["Habib471"]
@@ -65,7 +66,7 @@ LOVE_PHRASES = [
     "С тобой даже молчание звучит как музыка",
     "Ты — мой космос, полный светлых звёзд и тайных чудес",
     "Когда ты рядом, время замирает, оставляя только нас",
-    "Ты — теплое облако в холодном мире, что согревает душу",
+    "Ты — тёплое облако в холодном мире, что согревает душу",
     "С тобой даже простые слова обретают глубокий смысл",
     "Ты — мой утренний кофе, без которого не начинается день",
     "Каждое твоё «привет» — как солнечный луч, который освещает мой день",
@@ -141,7 +142,7 @@ LOVE_JOKES = [
     "Если бы любовь была кодом, я бы тебя компилировал снова и снова 💻",
 ]
 
-# Мини-веб-сервер для Render/Heroku
+# Мини-веб-сервер
 def run_web():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -153,7 +154,7 @@ def run_web():
 
 threading.Thread(target=run_web, daemon=True).start()
 
-# Последнее сообщение для пользователя
+# Последние сообщения
 last_messages = {}
 
 # /start
@@ -166,6 +167,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not TELEGRAM_TOKEN:
+        return
     message = update.message
     if not message or not message.from_user:
         return
@@ -189,6 +192,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Команда /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not TELEGRAM_TOKEN:
+        return
     message = update.message
     if not message or not message.text:
         return
@@ -199,11 +204,14 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Запуск бота
 async def main():
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("love", love_command))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    await app.run_polling()
+    if TELEGRAM_TOKEN:
+        app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("love", love_command))
+        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+        await app.run_polling()
+    else:
+        print("⚠️ TELEGRAM_TOKEN не задан, бот Telegram не запускается. Только веб-сервер работает.")
 
 if __name__ == "__main__":
     import asyncio
