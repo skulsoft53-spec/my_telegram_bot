@@ -15,7 +15,7 @@ print("✅ TELEGRAM_TOKEN найден, бот запускается...")
 TARGET_USERNAMES = ["Habib471"]
 SIGNATURE = "Полюби Апачи, как он тебя"
 
-# 140 осмысленных романтических фраз
+# 140 романтических фраз
 LOVE_PHRASES = [
     "Ты — моё вдохновение, нежное как дыхание весны, которое пробуждает в душе самые светлые чувства",
     "С тобой каждый день становится маленьким чудом, полным тепла и радости",
@@ -172,7 +172,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = message.from_user.username
     if message.chat.type in ["group", "supergroup"]:
         if username in TARGET_USERNAMES and random.random() < 0.3:
-            # 20% шанс выбрать шутку
             if random.random() < 0.2:
                 while True:
                     phrase = random.choice(LOVE_JOKES)
@@ -193,4 +192,19 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.text:
         return
-    args = message.text.split(maxsplit=
+    args = message.text.split(maxsplit=1)
+    target = args[1] if len(args) > 1 else message.from_user.username
+    score = random.randint(0, 100)
+    await message.reply_text(f"💞 Совместимость с {target}: {score}%")
+
+# Запуск бота
+async def main():
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("love", love_command))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    await app.run_polling()
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
