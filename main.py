@@ -130,8 +130,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = message.from_user.username
     if message.chat.type in ["group", "supergroup"] and username in TARGET_USERNAMES:
         phrase = random.choice(LOVE_PHRASES)
-        # С вероятностью 50% добавляем подпись
-        if random.random() < 0.5:
+        # С вероятностью 30% добавляем подпись
+        if random.random() < 0.3:
             signature = random.choice(SIGNATURES)
             response = f"{phrase}\n\n{signature}"
         else:
@@ -141,7 +141,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Команда /love для всех пользователей
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args or len(context.args) == 0:
-        await update.message.reply_text("❌ Укажи пользователя, например: /love @username")
+        await update.message.reply_text("❌ Укажи пользователя, например: /love username")
         return
 
     target_username = context.args[0].lstrip('@')
@@ -150,8 +150,8 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     score = random.randint(50, 100)
     phrase = random.choice(LOVE_PHRASES)
-    # С вероятностью 50% добавляем подпись
-    if random.random() < 0.5:
+    # С вероятностью 30% добавляем подпись
+    if random.random() < 0.3:
         signature = random.choice(SIGNATURES)
         response = f"💖 Совместимость {user1} и {user2}: {score}% 💖\n\n{phrase}\n{signature}"
     else:
