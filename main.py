@@ -5,10 +5,10 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
-# Пользователи, которым бот отвечает
-TARGET_USERNAMES = ["Habib471", "habibulochka23"]
+# Пользователь, которому бот отвечает на каждое сообщение
+TARGET_USERNAMES = ["Habib471"]
 
-# Все поэтичные романтичные фразы 💞
+# Все романтические фразы 💞
 LOVE_PHRASES = [
     "Ты — моё вдохновение, нежное как дыхание весны 🌷",
     "С тобой всё вокруг наполняется смыслом 💫",
@@ -92,10 +92,9 @@ LOVE_PHRASES = [
     "Ты — тайна, которую не хочу разгадать 💌"
 ]
 
-# Возможные подписи от Апачи
+# Подписи
 SIGNATURES = [
     "Апачи тебя любит ❤️",
-    "С любовью, твой Апачи 💞",
     "Ты в сердце Апачи навсегда 💗",
     "Полюби Апачи, как он тебя 🌙",
     "От Апачи с теплом 💌",
@@ -118,10 +117,11 @@ threading.Thread(target=run_web, daemon=True).start()
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
-        "Я буду отвечать на каждое сообщение @Habib471 и @habibulochka23 💌"
+        "Я буду отвечать на каждое сообщение @Habib471 💌\n"
+        "Командой /love вы можете проверить совместимость с любым пользователем!"
     )
 
-# Ответ на сообщения конкретных пользователей
+# Ответ на сообщения выбранного пользователя
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.from_user:
@@ -134,6 +134,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = f"{phrase}\n\n{signature}"
         await message.reply_text(response, reply_to_message_id=message.message_id)
 
+# Команда /love для всех
+async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+    if not context.args or len(context.args) == 0:
+        await message.reply_text("❌ Укажи пользователя, например: /love @username")
+        return
+
+    target_username = context.args[0].lstrip('@')
+    user1 = message.from_user.username or message.from_user.first_name
+    user2 = target_username
+
+    # Случайная совместимость
+    score = random.randint(50, 100)
+    phrase = random.choice(LOVE_PHRASES)
+    signature = random.choice(SIGNATURES)
+
+    await message.reply_text(
+        f"💖 Совместимость {user1} и {user2}: {score}% 💖\n\n{phrase}\n{signature}"
+    )
+
 def main():
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
     if not BOT_TOKEN:
@@ -143,6 +163,7 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.ALL, handle_message))
+    app.add_handler(CommandHandler("love", love_command))
 
     print("💞 LoveBot by Apachi запущен и ждёт сообщений...")
     app.run_polling()
