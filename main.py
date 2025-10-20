@@ -140,24 +140,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Команда /love для всех пользователей
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args or len(context.args) == 0:
-        await update.message.reply_text("❌ Укажи пользователя, например: /love username")
+    message = update.message
+    if not message or not message.text:
         return
 
-    target_username = context.args[0].lstrip('@')
-    user1 = update.message.from_user.username or update.message.from_user.first_name
+    # Разбираем команду вручную
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.reply_text("❌ Укажи пользователя, например: /love @username")
+        return
+
+    target_username = args[1].lstrip('@')
+    user1 = message.from_user.username or message.from_user.first_name
     user2 = target_username
 
     score = random.randint(50, 100)
     phrase = random.choice(LOVE_PHRASES)
-    # С вероятностью 30% добавляем подпись
-    if random.random() < 0.3:
-        signature = random.choice(SIGNATURES)
-        response = f"💖 Совместимость {user1} и {user2}: {score}% 💖\n\n{phrase}\n{signature}"
-    else:
-        response = f"💖 Совместимость {user1} и {user2}: {score}% 💖\n\n{phrase}"
 
-    await update.message.reply_text(response)
+    response = f"💖 Совместимость {user1} и {user2}: {score}% 💖\n\n{phrase}"
+    # Добавляем подпись с вероятностью 30%
+    if random.random() < 0.3:
+        response += f"\n\n{random.choice(SIGNATURES)}"
+
+    await message.reply_text(response)
 
 def main():
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -174,4 +179,4 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    main()  
