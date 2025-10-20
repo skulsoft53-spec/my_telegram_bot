@@ -5,13 +5,10 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
-# Бот отвечает только этому пользователю:
-TARGET_USERNAME = "@Habib471"
+# Пользователи, которым бот отвечает
+TARGET_USERNAMES = ["Habib471", "habibulochka23"]
 
-# Вероятность ответа (0.4 = 40%)
-RESPONSE_CHANCE = 0.4
-
-# Поэтичные романтичные фразы с эмодзи 💞
+# Все поэтичные романтичные фразы 💞
 LOVE_PHRASES = [
     "Ты — моё вдохновение, нежное как дыхание весны 🌷",
     "С тобой всё вокруг наполняется смыслом 💫",
@@ -104,7 +101,7 @@ SIGNATURES = [
     "От Апачи с теплом 💌",
 ]
 
-# === Мини-веб-сервер для Render (чтобы работал бесплатный тариф) ===
+# Мини-веб-сервер Render
 def run_web():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -115,29 +112,27 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
-# Запускаем веб-сервер в отдельном потоке
 threading.Thread(target=run_web, daemon=True).start()
 
-# === Обработчик команды /start ===
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
-        "Добавь меня в группу — и я буду дарить тебе романтику и нежные слова любви 💌"
+        "Я буду отвечать на каждое сообщение @Habib471 и @habibulochka23 💌"
     )
 
-# === Обработчик сообщений в группе ===
+# Ответ на сообщения конкретных пользователей
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.from_user:
         return
 
-    # Проверяем: сообщение от нужного пользователя и в группе
-    if message.chat.type in ["group", "supergroup"] and message.from_user.username == TARGET_USERNAME[1:]:
-        if random.random() <= RESPONSE_CHANCE:
-            phrase = random.choice(LOVE_PHRASES)
-            signature = random.choice(SIGNATURES)
-            response = f"{phrase}\n\n{signature}"
-            await message.reply_text(response)
+    username = message.from_user.username
+    if message.chat.type in ["group", "supergroup"] and username in TARGET_USERNAMES:
+        phrase = random.choice(LOVE_PHRASES)
+        signature = random.choice(SIGNATURES)
+        response = f"{phrase}\n\n{signature}"
+        await message.reply_text(response, reply_to_message_id=message.message_id)
 
 def main():
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
