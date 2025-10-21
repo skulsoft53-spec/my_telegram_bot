@@ -1,11 +1,11 @@
 import os
-import random
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
+import random
 
-# Токен из переменной окружения
+# Токен
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
     raise RuntimeError("Ошибка: переменная окружения TELEGRAM_TOKEN не установлена!")
@@ -18,7 +18,7 @@ bot_active = True
 last_messages = {}
 users_sent_messages = set()
 
-# Романтические фразы + шутки
+# Все романтические фразы + шутки
 LOVE_PHRASES = [
     "Ты — моё вдохновение, дыхание весны 🌸",
     "С тобой каждый день — маленькое чудо ✨",
@@ -137,7 +137,7 @@ LOVE_JOKES = [
     "Ты — любимая песня на повторе 🎶",
 ]
 
-# Веб-сервер
+# Веб-сервер для Render
 def run_web():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -149,12 +149,12 @@ def run_web():
 
 threading.Thread(target=run_web, daemon=True).start()
 
-# Базовые команды
+# Команды бота
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
         "Я реагирую на выбранных пользователей 💌\n"
-        "Команда /love проверяет совместимость ✨\n"
+        "Команда /love покажет все романтические фразы ✨\n"
         "Команды /on и /off включают и выключают бота."
     )
 
@@ -177,7 +177,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = message.from_user.username
     users_sent_messages.add(username)
     if message.chat.type in ["group", "supergroup"]:
-        if username in TARGET_USERNAMES and random.random() < 0.3:
+        if username in TARGET_USERNAMES:
             phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
             while last_messages.get(username) == phrase:
                 phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
@@ -192,22 +192,17 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = message.text.split(maxsplit=1)
     target = args[1] if len(args) > 1 else message.from_user.username
 
-    if target in TARGET_USERNAMES:
-        score = random.randint(70, 100)
-    else:
-        score = random.randint(0, 70)
+    score = random.randint(0, 100)
+    all_phrases = "\n".join(LOVE_PHRASES + LOVE_JOKES)
 
-    story = random.choice(LOVE_PHRASES + LOVE_JOKES)
-    emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=10))
-    
     await message.reply_text(
-        f"💌 Совместимость с {target}: {score}%\n"
-        f"{story} {emojis}\n\n{SIGNATURE}"
+        f"💌 Совместимость с {target}: {score}%\n\n"
+        f"{all_phrases}\n\n{SIGNATURE}"
     )
 
+# Главная функция
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("love", love_command))
     app.add_handler(CommandHandler("on", bot_on))
