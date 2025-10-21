@@ -1,22 +1,21 @@
 import os
 import random
 import threading
-import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-# ===================== Настройки =====================
+# ====== Настройки ======
+OWNER_USERNAME = "bxuwy"  # только этот пользователь может /restart
+TARGET_USERNAMES = ["Habib471"]
+SIGNATURE = "Полюби Апачи, как он тебя"
+
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
     raise RuntimeError("Ошибка: переменная окружения TELEGRAM_TOKEN не установлена!")
 print("✅ TELEGRAM_TOKEN найден, бот запускается...")
 
-BOT_OWNER = "bxuwy"  # твой ник в Telegram
-TARGET_USERNAMES = ["Habib471"]
-SIGNATURE = "Полюби Апачи, как он тебя"
-
-# ===================== 140 романтических фраз =====================
+# ====== 140 романтических фраз ======
 LOVE_PHRASES = [
     "Ты — моё вдохновение, нежное как дыхание весны, которое пробуждает в душе самые светлые чувства",
     "С тобой каждый день становится маленьким чудом, полным тепла и радости",
@@ -128,7 +127,7 @@ LOVE_PHRASES = [
     "Ты — вдохновение, которое оживляет каждую мысль",
 ]
 
-# ===================== Маленькие шутки =====================
+# ====== Маленькие шутки ======
 LOVE_JOKES = [
     "Ты как Wi-Fi — когда тебя рядом, всё работает идеально 😄",
     "Ты — моя батарейка, без тебя я теряю заряд ❤️",
@@ -142,7 +141,7 @@ LOVE_JOKES = [
     "Если бы любовь была кодом, я бы тебя компилировал снова и снова 💻",
 ]
 
-# ===================== Мини-веб-сервер для Render =====================
+# ====== Веб-сервер для Render ======
 def run_web():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -154,11 +153,10 @@ def run_web():
 
 threading.Thread(target=run_web, daemon=True).start()
 
-# ===================== Последние сообщения =====================
+# ====== Последние сообщения ======
 last_messages = {}
-restart_chat_id = None
 
-# ===================== Обработчики =====================
+# ====== Хендлеры ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
@@ -171,7 +169,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message or not message.from_user:
         return
     username = message.from_user.username
-    if message.chat.type in ["group", "supergroup"]:
+    if message.chat.type in ["group", "supergroup", "private"]:
         if username in TARGET_USERNAMES and random.random() < 0.3:
             if random.random() < 0.2:
                 while True:
@@ -198,26 +196,26 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await message.reply_text(f"💞 Совместимость с {target}: {score}%")
 
 async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global restart_chat_id
     message = update.message
-    if not message:
+    if not message or not message.from_user:
         return
-    if message.from_user.username != BOT_OWNER:
-        await message.reply_text("❌ Только владелец бота может перезапускать его!")
+    username = message.from_user.username
+    if username != OWNER_USERNAME:
+        await message.reply_text("❌ Команда доступна только владельцу!")
         return
-    restart_chat_id = message.chat_id
-    await message.reply_text("♻️ Бот перезапускается...")
-    os.execv(sys.executable, [sys.executable] + sys.argv)
+    await message.reply_text("♻️ Перезапускаю бота...")
+    os.execv(__file__, ["python3"] + [__file__])
 
-# ===================== Запуск бота =====================
-async def main():
+# ====== Запуск бота ======
+def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("love", love_command))
     app.add_handler(CommandHandler("restart", restart_command))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    await app.run_polling()
+    
+    app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
