@@ -155,7 +155,6 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     hearts = ["❤️", "💖", "💓", "💘"]
     sparkles = ["✨", "💫", "🌸", "⭐"]
 
-    # мгновенное заполнение шкалы
     filled_length = final_score * bar_length // 100
     bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
     flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
@@ -170,7 +169,6 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target.lower() == SIGNATURE_USER.lower():
         result_text += f"\n\n{SIGNATURE_TEXT}"
 
-    # мини-вспышки
     for _ in range(3):
         mini_flash = "".join(random.choices(hearts + sparkles, k=random.randint(2, 5)))
         await sent_msg.edit_text(f"{result_text}\n\n{mini_flash}")
@@ -178,7 +176,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await sent_msg.edit_text(result_text)
 
-# 🎁 /gift с мгновенной шкалой и ускоренной анимацией
+# 🎁 /gift с мгновенной шкалой и мини-вспышками
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -190,19 +188,25 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target = args[1].replace("@", "")
     gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
     gift = random.choice(gift_list)
-    sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} готовит подарок для @{target}...\n\nПодготовка...")
 
-    # мгновенное заполнение шкалы
+    sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} готовит подарок для @{target}...\n\n0% [----------]")
+
     bar_length = 10
     hearts = ["❤️", "💖", "💓", "💘"]
     sparkles = ["✨", "💫", "🌸", "⭐"]
-    filled_length = bar_length
-    bar = "🎁 " + "■" * filled_length + " " * (bar_length - filled_length)
-    flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(2, 4)))
-    await sent_msg.edit_text(f"{bar} {flying_hearts}")
 
-    # финальный подарок
-    await asyncio.sleep(0.05)
+    # мгновенное заполнение шкалы
+    filled_length = bar_length
+    bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
+    flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(2, 4)))
+    await sent_msg.edit_text(f"🎁 @{message.from_user.username} 💖 @{target}\n100% [{bar}] {flying_hearts}")
+
+    # мини-вспышки
+    for _ in range(3):
+        mini_flash = "".join(random.choices(hearts + sparkles, k=random.randint(3, 6)))
+        await sent_msg.edit_text(f"🎁 @{message.from_user.username} 💖 @{target}\n{bar} {mini_flash}")
+        await asyncio.sleep(0.05)
+
     await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}\n\n✨ Пусть этот момент запомнится надолго!")
 
 # 💬 Реакция на сообщения выбранных пользователей
