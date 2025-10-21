@@ -150,7 +150,7 @@ def run_web():
 
 threading.Thread(target=run_web, daemon=True).start()
 
-# Команды
+# Команды бота
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
@@ -185,7 +185,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_messages[username] = phrase
             await message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
 
-# Улучшенная команда /love
+# Команда /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
