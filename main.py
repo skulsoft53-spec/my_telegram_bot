@@ -149,12 +149,12 @@ def run_web():
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 threading.Thread(target=run_web, daemon=True).start()
 
-# Команды /start, /on, /off
+# Команды
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
         "Я реагирую на выбранных пользователей 💌\n"
-        "Команда /love проверяет совместимость и отправляет романтику ✨\n"
+        "Команда /love проверяет совместимость ✨\n"
         "Команды /on и /off включают и выключают бота."
     )
 
@@ -168,7 +168,6 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_active = False
     await update.message.reply_text("🔕 Бот выключен!")
 
-# Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -185,7 +184,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_messages[username] = phrase
             await message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
 
-# Эффект печати + эмодзи для /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -207,12 +205,11 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text_to_send += char
         await sent_message.edit_text(text_to_send)
         await asyncio.sleep(0.03)
-    for _ in range(10):  # эмодзи-поток
+    for _ in range(10):
         text_to_send += random.choice(emojis)
         await sent_message.edit_text(text_to_send)
         await asyncio.sleep(0.1)
 
-# Уведомление при старте
 async def notify_start(app):
     try:
         updates = await app.bot.get_updates(limit=100)
@@ -234,16 +231,17 @@ async def notify_start(app):
     except Exception as e:
         print("Ошибка уведомления при старте:", e)
 
-# Главная функция
-async def main():
+# Главный запуск
+if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("love", love_command))
     app.add_handler(CommandHandler("on", bot_on))
     app.add_handler(CommandHandler("off", bot_off))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    await notify_start(app)
-    await app.run_polling()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    
+    # Уведомление о запуске
+    asyncio.get_event_loop().create_task(notify_start(app))
+    
+    # Запуск бота
+    app.run_polling()
