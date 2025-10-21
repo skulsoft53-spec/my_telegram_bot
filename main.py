@@ -1,6 +1,7 @@
 import os
 import random
 import threading
+import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
@@ -129,6 +130,7 @@ LOVE_PHRASES = [
     "Ты — вдохновение, оживляющее мысли ✍️",
 ]
 
+# Шутки про любовь
 LOVE_JOKES = [
     "Ты как Wi-Fi — рядом, и всё идеально 😄",
     "Ты — батарейка, без тебя теряю заряд 🔋",
@@ -184,7 +186,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_messages[username] = phrase
             await message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
 
-# Команда /love
+# Команда /love с анимацией и правильным процентом
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -194,28 +196,15 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     score = random.randint(0, 100)
 
     bar_length = 10
-    filled_length = score * bar_length // 100
-    bar = "█" * filled_length + "□" * (bar_length - filled_length)
+    sent_message = await message.reply_text(f"💌 Совместимость с {target}: 0%\n[{'□'*bar_length}]")
 
-    love_stories = [
-        f"💖 {target} однажды встретил(а) тебя в дождливый день, и мир заиграл цветами на {score}% 🌈",
-        f"💘 Судьба свела вас в парке, и с тех пор ваше сердце бьется на {score}% в унисон 🌟",
-        f"💞 На {score}% вы — как две половинки одного пазла 🧩💓",
-        f"💓 Ваши души переплелись на {score}% и вместе создают маленькие чудеса ✨🌸",
-        f"🌹 {target} приносит в твою жизнь {score}% счастья и бесконечную нежность 💫",
-        f"✨ Вы словно магниты на {score}% притягиваете друг друга 💞💖",
-        f"💫 Каждое мгновение с {target} наполняет твою жизнь радостью на {score}% 🌈",
-    ]
-    story = random.choice(love_stories)
-
-    sent_message = await message.reply_text(f"💌 Совместимость с {target}: 0%\n[{ '□'*10 }]")
-
-    for i in range(1, score+1):
-        filled = i * bar_length // 100
-        bar = "█" * filled + "□" * (bar_length - filled)
+    for i in range(1, score + 1):
+        filled_length = i * bar_length // 100
+        bar = "█" * filled_length + "□" * (bar_length - filled_length)
         await sent_message.edit_text(f"💌 Совместимость с {target}: {i}%\n[{bar}]")
-        await asyncio.sleep(0.02)
+        await asyncio.sleep(0.03)
 
+    story = random.choice(LOVE_PHRASES + LOVE_JOKES)
     text_to_send = ""
     emojis = ["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"]
     for char in story:
