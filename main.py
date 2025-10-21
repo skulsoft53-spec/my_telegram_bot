@@ -20,7 +20,7 @@ OWNER_USERNAME = "bxuwy"
 bot_active = True
 last_messages = {}
 
-# 💖 Простые романтические фразы (без эмодзи)
+# 💖 Простые романтические фразы
 LOVE_PHRASES = [
     "Ты мне дорог", "Я рад, что ты есть", "Ты особенная", "Ты мой человек",
     "С тобой спокойно", "Ты просто счастье", "Ты делаешь день лучше", "Ты важна",
@@ -48,7 +48,6 @@ LOVE_PHRASES = [
     "Ты — моя самая добрая мысль"
 ]
 
-# 💞 Специальные фразы для Habib471
 SPECIAL_PHRASES = [
     "С тобой даже тишина звучит красиво 💫",
     "Ты — причина улыбки Апачи 💖",
@@ -102,13 +101,14 @@ GIFTS_FUNNY = [
     "🐸 Лягушку удачи (вдруг принц?)",
 ]
 
-# 🌐 Мини-сервер для Render
+# 🌐 Мини-сервер
 def run_web():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"LoveBot is running <3")
+
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
@@ -140,31 +140,55 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_active = False
     await update.message.reply_text("🔕 Бот выключен!")
 
-# 💘 Команда /love с красивым оформлением
+# 💘 Команда /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
     message = update.message
     args = message.text.split(maxsplit=1)
     target = args[1].replace("@", "") if len(args) > 1 else message.from_user.username
-
-    score = random.randint(0, 100)
+    final_score = random.randint(0, 100)
     phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
-    category = next((label for (low, high, label) in LOVE_LEVELS if low <= score <= high), "💞 Нежные чувства")
-    emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=4))
+    category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
 
-    text_to_send = (
-        f"💞 Проверяем совместимость между @{message.from_user.username} и @{target}...\n"
-        f"🎯 Результат: {score}%\n\n"
+    sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n0% [----------]")
+
+    bar_length = 10
+    hearts = ["❤️", "💖", "💓", "💘"]
+    sparkles = ["✨", "💫", "🌸", "⭐"]
+    for i in range(final_score + 1):
+        filled_length = i * bar_length // 100
+        bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
+        flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
+        await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{i}% [{bar}] {flying_hearts}")
+        await asyncio.sleep(0.1)
+
+    emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=6))
+    result_text = (
+        f"💞 @{message.from_user.username} 💖 @{target}\n"
+        f"🎯 Результат: {final_score}%\n"
         f"{phrase}\n\nКатегория: {category} {emojis}"
     )
-
     if target.lower() == SIGNATURE_USER.lower():
-        text_to_send += f"\n\n{SIGNATURE_TEXT}"
+        result_text += f"\n\n{SIGNATURE_TEXT}"
 
-    await message.reply_text(text_to_send)
+    await sent_msg.edit_text(result_text)
 
-# 🎁 Команда /gift с анимацией
+    for wave in range(8):
+        lines = [""] * 6
+        for _ in range(12):
+            line_index = random.randint(0, 5)
+            lines[line_index] += random.choice(hearts + sparkles)
+        flying_text = "\n".join(lines)
+        await sent_msg.edit_text(f"{result_text}\n\n{flying_text}")
+        await asyncio.sleep(0.1)
+
+    for i in range(3):
+        last_hearts = "\n".join(["❤️" * random.randint(1, 4) for _ in range(5)])
+        await sent_msg.edit_text(f"{result_text}\n\n{last_hearts}")
+        await asyncio.sleep(0.1)
+
+# 🎁 Команда /gift
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -173,7 +197,6 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 2:
         await message.reply_text("🎁 Используй: /gift @username")
         return
-
     target = args[1].replace("@", "")
     gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
     gift = random.choice(gift_list)
@@ -225,8 +248,7 @@ def main():
     app.add_handler(CommandHandler("on", bot_on))
     app.add_handler(CommandHandler("off", bot_off))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-
-    print("💘 LoveBot запущен и готов дарить любовь и подарки!")
+    print("🚀 Бот запущен!")
     app.run_polling()
 
 if __name__ == "__main__":
