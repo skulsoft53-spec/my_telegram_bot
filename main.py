@@ -155,7 +155,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
         "Я реагирую на выбранных пользователей 💌\n"
-        "Команда /love покажет все романтические фразы ✨\n"
+        "Команда /love покажет романтические фразы ✨\n"
         "Команды /on и /off включают и выключают бота."
     )
 
@@ -191,13 +191,15 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
     message = update.message
-    args = message.text.split(maxsplit=1)
-    target = args[1] if len(args) > 1 else message.from_user.username
+    target = message.from_user.username
 
     score = random.randint(0, 100)
-    all_phrases = "\n".join(LOVE_PHRASES + LOVE_JOKES)
-    text_to_send = f"💌 Совместимость с {target}: {score}%\n\n{all_phrases}"
+    phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
+    emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=5))
 
+    text_to_send = f"💌 Совместимость с {target}: {score}%\n{phrase} {emojis}"
+
+    # Подпись только для Habib471
     if target == SIGNATURE_USER:
         text_to_send += f"\n\n{SIGNATURE_TEXT}"
 
