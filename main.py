@@ -13,7 +13,8 @@ print("✅ TELEGRAM_TOKEN найден, бот запускается...")
 
 # Настройки
 TARGET_USERNAMES = ["Habib471"]
-SIGNATURE = "Полюби Апачи, как он тебя"
+SIGNATURE_USER = "Habib471"
+SIGNATURE_TEXT = "Полюби Апачи, как он тебя"
 bot_active = True
 last_messages = {}
 users_sent_messages = set()
@@ -137,7 +138,7 @@ LOVE_JOKES = [
     "Ты — любимая песня на повторе 🎶",
 ]
 
-# Веб-сервер для Render
+# Веб-сервер
 def run_web():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -149,7 +150,7 @@ def run_web():
 
 threading.Thread(target=run_web, daemon=True).start()
 
-# Команды бота
+# Команды
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
@@ -179,12 +180,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message.chat.type in ["group", "supergroup"]:
         if username in TARGET_USERNAMES:
             phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
-            while last_messages.get(username) == phrase:
-                phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
             last_messages[username] = phrase
-            await message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
+            text_to_send = phrase
+            if username == SIGNATURE_USER:
+                text_to_send += f"\n\n{SIGNATURE_TEXT}"
+            await message.reply_text(text_to_send, reply_to_message_id=message.message_id)
 
-# Быстрая команда /love
+# Команда /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -194,11 +196,12 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     score = random.randint(0, 100)
     all_phrases = "\n".join(LOVE_PHRASES + LOVE_JOKES)
+    text_to_send = f"💌 Совместимость с {target}: {score}%\n\n{all_phrases}"
 
-    await message.reply_text(
-        f"💌 Совместимость с {target}: {score}%\n\n"
-        f"{all_phrases}\n\n{SIGNATURE}"
-    )
+    if target == SIGNATURE_USER:
+        text_to_send += f"\n\n{SIGNATURE_TEXT}"
+
+    await message.reply_text(text_to_send)
 
 # Главная функция
 def main():
