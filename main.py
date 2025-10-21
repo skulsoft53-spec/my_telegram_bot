@@ -140,7 +140,7 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_active = False
     await update.message.reply_text("🔕 Бот выключен!")
 
-# 💘 Команда /love с мгновенной шкалой
+# 💘 Команда /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -157,7 +157,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     hearts = ["❤️", "💖", "💓", "💘"]
     sparkles = ["✨", "💫", "🌸", "⭐"]
 
-    # Мгновенное заполнение шкалы
+    # мгновенное заполнение шкалы
     filled_length = final_score * bar_length // 100
     bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
     flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
@@ -172,7 +172,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target.lower() == SIGNATURE_USER.lower():
         result_text += f"\n\n{SIGNATURE_TEXT}"
 
-    # Мини-вспышка для красоты
+    # мини-вспышки
     for _ in range(3):
         mini_flash = "".join(random.choices(hearts + sparkles, k=random.randint(2, 5)))
         await sent_msg.edit_text(f"{result_text}\n\n{mini_flash}")
@@ -180,7 +180,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await sent_msg.edit_text(result_text)
 
-# 🎁 Команда /gift
+# 🎁 Команда /gift с ускоренной анимацией
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -210,7 +210,7 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for frame in animation_frames:
         await sent_msg.edit_text(frame)
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.02)  # ускоренная анимация
 
 # 💬 Реакция на сообщения выбранных пользователей
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
