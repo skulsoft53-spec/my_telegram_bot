@@ -1,10 +1,16 @@
 import os
 import random
-import asyncio
 import threading
+import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes
+)
 
 # Токен из переменной окружения
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -19,16 +25,27 @@ bot_active = True
 last_messages = {}
 users_sent_messages = set()
 
-# Пример фраз
+# Списки фраз
 LOVE_PHRASES = [
     "Ты — моё вдохновение, дыхание весны 🌸",
     "С тобой каждый день — маленькое чудо ✨",
     "Ты — моя мелодия счастья 🎶",
+    "В твоих глазах вижу небо и свет 🌌",
+    "Каждое слово твоё — ветерок в душе 🍃",
+    "С тобой тишина звучит как музыка 🎵",
+    "Ты — дыхание света в сердце 💖",
+    "Когда ты рядом, мир мягче 🌈",
+    "Ты — утренний луч, озаряющий душу ☀️",
+    "С тобой каждый момент — страница сказки 📖",
+    # ... добавь остальные фразы
 ]
 
 LOVE_JOKES = [
     "Ты как Wi-Fi — рядом, и всё идеально 😄",
     "Ты — батарейка, без тебя теряю заряд 🔋",
+    "Если бы ты был кофе, не просыпался бы без тебя ☕",
+    "Ты как пароль: сложный, но жизнь без тебя невозможна 🔑",
+    "Ты — любимая песня на повторе 🎶",
 ]
 
 # Веб-сервер для Render
@@ -78,7 +95,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_messages[username] = phrase
             await message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
 
-# Команда /love с анимацией
+# Команда /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -88,24 +105,30 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     score = random.randint(0, 100)
 
     bar_length = 10
-    bar = "□" * bar_length
+    filled_length = score * bar_length // 100
+    bar = "█" * filled_length + "□" * (bar_length - filled_length)
 
     love_stories = [
         f"💖 {target} однажды встретил(а) тебя в дождливый день, и мир заиграл цветами на {score}% 🌈",
+        f"💘 Судьба свела вас в парке, и с тех пор ваше сердце бьется на {score}% в унисон 🌟",
         f"💞 На {score}% вы — как две половинки одного пазла 🧩💓",
+        f"💓 Ваши души переплелись на {score}% и вместе создают маленькие чудеса ✨🌸",
+        f"🌹 {target} приносит в твою жизнь {score}% счастья и бесконечную нежность 💫",
+        f"✨ Вы словно магниты на {score}% притягиваете друг друга 💞💖",
+        f"💫 Каждое мгновение с {target} наполняет твою жизнь радостью на {score}% 🌈",
     ]
     story = random.choice(love_stories)
 
-    sent_message = await message.reply_text(f"💌 Совместимость с {target}: 0%\n[{bar}]")
+    sent_message = await message.reply_text(f"💌 Совместимость с {target}: 0%\n[{ '□'*10 }]")
 
     # Анимация прогресса
-    for i in range(1, score + 1):
+    for i in range(1, score+1):
         filled = i * bar_length // 100
         bar = "█" * filled + "□" * (bar_length - filled)
         await sent_message.edit_text(f"💌 Совместимость с {target}: {i}%\n[{bar}]")
         await asyncio.sleep(0.02)
 
-    # Анимация истории
+    # Анимация текста
     text_to_send = ""
     emojis = ["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"]
     for char in story:
@@ -119,7 +142,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await sent_message.edit_text(f"{text_to_send}\n\n{SIGNATURE}")
 
-# Уведомление при старте для чатов и пользователей
+# Уведомление при старте
 async def notify_start(app):
     try:
         updates = await app.bot.get_updates(limit=100)
@@ -143,17 +166,21 @@ async def notify_start(app):
 
 # Главная функция
 async def main():
-    async with ApplicationBuilder().token(TELEGRAM_TOKEN).build() as app:
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("love", love_command))
-        app.add_handler(CommandHandler("on", bot_on))
-        app.add_handler(CommandHandler("off", bot_off))
-        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("love", love_command))
+    app.add_handler(CommandHandler("on", bot_on))
+    app.add_handler(CommandHandler("off", bot_off))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
-        # Отправляем уведомления после запуска
-        asyncio.create_task(notify_start(app))
-
-        await app.run_polling()
+    await app.initialize()
+    await app.start()
+    asyncio.create_task(notify_start(app))
+    await app.updater.start_polling()
+    await app.idle()
+    await app.stop()
+    await app.shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
