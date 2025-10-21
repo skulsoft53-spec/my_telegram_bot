@@ -19,19 +19,15 @@ bot_active = True
 last_messages = {}
 users_sent_messages = set()
 
-# 100 красивых романтических фраз (сокращено для примера, вставьте полный список)
+# Пример фраз (твой полный список LOVE_PHRASES вставляй здесь)
 LOVE_PHRASES = [
-    "Ты — моё вдохновение, дыхание весны 🌸",
+    "Ты — моё вдохновение 🌸",
     "С тобой каждый день — маленькое чудо ✨",
-    # ... остальные фразы ...
 ]
 
 LOVE_JOKES = [
     "Ты как Wi-Fi — рядом, и всё идеально 😄",
     "Ты — батарейка, без тебя теряю заряд 🔋",
-    "Если бы ты был кофе, не просыпался бы без тебя ☕",
-    "Ты как пароль: сложный, но жизнь без тебя невозможна 🔑",
-    "Ты — любимая песня на повторе 🎶",
 ]
 
 # Веб-сервер для Render
@@ -66,24 +62,21 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔕 Бот выключен!")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not bot_active:
+    if not bot_active or not update.message or not update.message.from_user:
         return
-    message = update.message
-    if not message or not message.from_user:
-        return
-    username = message.from_user.username
+    username = update.message.from_user.username
     users_sent_messages.add(username)
-    if message.chat.type in ["group", "supergroup"]:
+    if update.message.chat.type in ["group", "supergroup"]:
         if username in TARGET_USERNAMES and random.random() < 0.3:
             phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
             while last_messages.get(username) == phrase:
                 phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
             last_messages[username] = phrase
-            await message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
+            await update.message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=update.message.message_id)
 
-# Команда /love с прогресс-баром и анимацией
+# Команда /love с анимацией
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not bot_active:
+    if not bot_active or not update.message:
         return
     message = update.message
     args = message.text.split(maxsplit=1)
@@ -95,26 +88,19 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bar = "█" * filled_length + "□" * (bar_length - filled_length)
 
     love_stories = [
-        f"💖 {target} однажды встретил(а) тебя в дождливый день, и мир заиграл цветами на {score}% 🌈",
-        f"💘 Судьба свела вас в парке, и с тех пор ваше сердце бьется на {score}% в унисон 🌟",
-        f"💞 На {score}% вы — как две половинки одного пазла 🧩💓",
-        f"💓 Ваши души переплелись на {score}% и вместе создают маленькие чудеса ✨🌸",
-        f"🌹 {target} приносит в твою жизнь {score}% счастья и бесконечную нежность 💫",
-        f"✨ Вы словно магниты на {score}% притягиваете друг друга 💞💖",
-        f"💫 Каждое мгновение с {target} наполняет твою жизнь радостью на {score}% 🌈",
+        f"💖 {target} встретил(а) тебя, и мир заиграл цветами на {score}% 🌈",
+        f"💘 Ваши сердца бьются на {score}% в унисон 🌟",
     ]
     story = random.choice(love_stories)
 
     sent_message = await message.reply_text(f"💌 Совместимость с {target}: 0%\n[{ '□'*10 }]")
 
-    # Анимация прогресса
     for i in range(1, score+1):
         filled = i * bar_length // 100
         bar = "█" * filled + "□" * (bar_length - filled)
         await sent_message.edit_text(f"💌 Совместимость с {target}: {i}%\n[{bar}]")
         await asyncio.sleep(0.02)
 
-    # Анимация текста истории
     text_to_send = ""
     emojis = ["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"]
     for char in story:
@@ -132,10 +118,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def notify_start(app):
     try:
         updates = await app.bot.get_updates(limit=100)
-        chats = set()
-        for u in updates:
-            if u.message:
-                chats.add(u.message.chat.id)
+        chats = {u.message.chat.id for u in updates if u.message}
         for chat_id in chats:
             try:
                 await app.bot.send_message(chat_id=chat_id, text="💌 LoveBot запущен и онлайн!")
@@ -160,10 +143,9 @@ async def main():
     app.add_handler(CommandHandler("off", bot_off))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
-    # notify_start запускается после инициализации бота
+    # Добавляем notify_start через post_init
     app.post_init.append(notify_start)
 
-    # Запуск polling
     await app.run_polling()
 
 if __name__ == "__main__":
