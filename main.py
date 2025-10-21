@@ -1,7 +1,6 @@
 import os
 import random
 import threading
-import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
@@ -19,7 +18,7 @@ bot_active = True
 last_messages = {}
 users_sent_messages = set()
 
-# 100 красивых романтических фраз
+# Романтические фразы + шутки
 LOVE_PHRASES = [
     "Ты — моё вдохновение, дыхание весны 🌸",
     "С тобой каждый день — маленькое чудо ✨",
@@ -130,7 +129,6 @@ LOVE_PHRASES = [
     "Ты — вдохновение, оживляющее мысли ✍️",
 ]
 
-# Шутки про любовь
 LOVE_JOKES = [
     "Ты как Wi-Fi — рядом, и всё идеально 😄",
     "Ты — батарейка, без тебя теряю заряд 🔋",
@@ -139,7 +137,7 @@ LOVE_JOKES = [
     "Ты — любимая песня на повторе 🎶",
 ]
 
-# Веб-сервер для Render
+# Веб-сервер
 def run_web():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -151,7 +149,7 @@ def run_web():
 
 threading.Thread(target=run_web, daemon=True).start()
 
-# Команды бота
+# Базовые команды
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
@@ -186,39 +184,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_messages[username] = phrase
             await message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
 
-# Команда /love с анимацией и правильным процентом
+# Быстрая команда /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
     message = update.message
     args = message.text.split(maxsplit=1)
     target = args[1] if len(args) > 1 else message.from_user.username
-    score = random.randint(0, 100)
 
-    bar_length = 10
-    sent_message = await message.reply_text(f"💌 Совместимость с {target}: 0%\n[{'□'*bar_length}]")
-
-    for i in range(1, score + 1):
-        filled_length = i * bar_length // 100
-        bar = "█" * filled_length + "□" * (bar_length - filled_length)
-        await sent_message.edit_text(f"💌 Совместимость с {target}: {i}%\n[{bar}]")
-        await asyncio.sleep(0.03)
+    if target in TARGET_USERNAMES:
+        score = random.randint(70, 100)
+    else:
+        score = random.randint(0, 70)
 
     story = random.choice(LOVE_PHRASES + LOVE_JOKES)
-    text_to_send = ""
-    emojis = ["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"]
-    for char in story:
-        text_to_send += char
-        await sent_message.edit_text(text_to_send)
-        await asyncio.sleep(0.03)
-    for _ in range(15):
-        text_to_send += random.choice(emojis)
-        await sent_message.edit_text(text_to_send)
-        await asyncio.sleep(0.1)
+    emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=10))
+    
+    await message.reply_text(
+        f"💌 Совместимость с {target}: {score}%\n"
+        f"{story} {emojis}\n\n{SIGNATURE}"
+    )
 
-    await sent_message.edit_text(f"{text_to_send}\n\n{SIGNATURE}")
-
-# Главная функция
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
