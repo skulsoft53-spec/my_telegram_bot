@@ -1,24 +1,22 @@
 import os
+import sys
 import random
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
-# Токен Telegram из переменных окружения
+# --- токен и проверка ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-
-# Проверка токена
 if not TELEGRAM_TOKEN:
     raise RuntimeError("❌ Ошибка: переменная окружения TELEGRAM_TOKEN не установлена!")
-
 print("✅ TELEGRAM_TOKEN найден, бот запускается...")
 
-# Пользователи, на которых бот отвечает
 TARGET_USERNAMES = ["Habib471"]
+AUTHORIZED_USERNAMES = ["bxuwy"]  # твой username для команды /restart
 SIGNATURE = "Полюби Апачи, как он тебя"
 
-# 140 романтических фраз
+# --- 140 романтических фраз ---
 LOVE_PHRASES = [
     "Ты — моё вдохновение, нежное как дыхание весны, которое пробуждает в душе самые светлые чувства",
     "С тобой каждый день становится маленьким чудом, полным тепла и радости",
@@ -127,10 +125,10 @@ LOVE_PHRASES = [
     "Когда ты смотришь на меня, я вижу всё самое ценное в мире",
     "Ты — мягкий шелест счастья в моём сердце",
     "С тобой я учусь радоваться каждому мгновению",
-    "Ты — вдохновение, которое оживляет каждую мысль"
+    "Ты — вдохновение, которое оживляет каждую мысль",
 ]
 
-# Маленькие шутки
+# --- шутки ---
 LOVE_JOKES = [
     "Ты как Wi-Fi — когда тебя рядом, всё работает идеально 😄",
     "Ты — моя батарейка, без тебя я теряю заряд ❤️",
@@ -141,10 +139,10 @@ LOVE_JOKES = [
     "Ты как солнечный день в дождливую погоду 🌞",
     "Ты делаешь мою жизнь как хороший сериал — невозможно оторваться 🎬",
     "Ты — моя любимая ошибка, о которой я никогда не пожалел 😍",
-    "Если бы любовь была кодом, я бы тебя компилировал снова и снова 💻"
+    "Если бы любовь была кодом, я бы тебя компилировал снова и снова 💻",
 ]
 
-# Мини-веб-сервер для Render/Heroku
+# --- мини веб-сервер для Render ---
 def run_web():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -156,41 +154,30 @@ def run_web():
 
 threading.Thread(target=run_web, daemon=True).start()
 
-# Последнее сообщение для пользователя
+# --- последние сообщения ---
 last_messages = {}
 
-# /start
+# --- команды ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
         "Я отвечаю на сообщения выбранных пользователей 💌\n"
-        "Командой /love <имя> можно проверить совместимость!"
+        "Командой /love можно проверить совместимость!"
     )
 
-# Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.from_user:
         return
     username = message.from_user.username
-    if message.chat.type in ["group", "supergroup"]:
-        if username in TARGET_USERNAMES and random.random() < 0.3:
-            if random.random() < 0.2:
-                while True:
-                    phrase = random.choice(LOVE_JOKES)
-                    if last_messages.get(username) != phrase:
-                        last_messages[username] = phrase
-                        break
-            else:
-                while True:
-                    phrase = random.choice(LOVE_PHRASES)
-                    if last_messages.get(username) != phrase:
-                        last_messages[username] = phrase
-                        break
-            response = phrase + f"\n\n{SIGNATURE}"
-            await message.reply_text(response, reply_to_message_id=message.message_id)
+    if username in TARGET_USERNAMES and random.random() < 0.3:
+        # 20% шанс выбрать шутку
+        phrase = random.choice(LOVE_PHRASES if random.random() > 0.2 else LOVE_JOKES)
+        while last_messages.get(username) == phrase:
+            phrase = random.choice(LOVE_PHRASES if random.random() > 0.2 else LOVE_JOKES)
+        last_messages[username] = phrase
+        await message.reply_text(phrase + f"\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
 
-# Команда /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.text:
@@ -200,10 +187,19 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     score = random.randint(0, 100)
     await message.reply_text(f"💞 Совместимость с {target}: {score}%")
 
-# Запуск бота
+async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    username = update.message.from_user.username
+    if username not in AUTHORIZED_USERNAMES:
+        await update.message.reply_text("❌ У тебя нет прав на перезапуск бота.")
+        return
+    await update.message.reply_text("♻️ Перезапускаю бота...")
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+# --- запуск бота ---
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("love", love_command))
+    app.add_handler(CommandHandler("restart", restart))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     app.run_polling()
