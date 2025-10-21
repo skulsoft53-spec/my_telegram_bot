@@ -108,7 +108,6 @@ def run_web():
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"LoveBot is running <3")
-
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
@@ -140,7 +139,7 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_active = False
     await update.message.reply_text("🔕 Бот выключен!")
 
-# 💘 Команда /love
+# 💘 /love с мгновенной шкалой
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -150,7 +149,6 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     final_score = random.randint(0, 100)
     phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
     category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
-
     sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n0% [----------]")
 
     bar_length = 10
@@ -180,7 +178,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await sent_msg.edit_text(result_text)
 
-# 🎁 Команда /gift с мгновенной анимацией
+# 🎁 /gift с мгновенной шкалой и ускоренной анимацией
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -192,19 +190,20 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target = args[1].replace("@", "")
     gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
     gift = random.choice(gift_list)
-
     sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} готовит подарок для @{target}...\n\nПодготовка...")
 
-    # мгновенная шкала
+    # мгновенное заполнение шкалы
     bar_length = 10
-    filled_length = random.randint(6, 10)
-    bar = "🎁" * filled_length + "⬜" * (bar_length - filled_length)
-    await sent_msg.edit_text(f"🎁 @{message.from_user.username} 💝 @{target}\n[{bar}]")
+    hearts = ["❤️", "💖", "💓", "💘"]
+    sparkles = ["✨", "💫", "🌸", "⭐"]
+    filled_length = bar_length
+    bar = "🎁 " + "■" * filled_length + " " * (bar_length - filled_length)
+    flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(2, 4)))
+    await sent_msg.edit_text(f"{bar} {flying_hearts}")
 
-    # финальный текст подарка
-    final_text = f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}\n\n✨ Пусть этот момент запомнится надолго!"
+    # финальный подарок
     await asyncio.sleep(0.05)
-    await sent_msg.edit_text(final_text)
+    await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}\n\n✨ Пусть этот момент запомнится надолго!")
 
 # 💬 Реакция на сообщения выбранных пользователей
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -216,7 +215,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = message.from_user.username
     if not username:
         return
-
     if message.chat.type in ["group", "supergroup"] and username in TARGET_USERNAMES:
         phrase = random.choice(SPECIAL_PHRASES)
         while last_messages.get(username) == phrase:
