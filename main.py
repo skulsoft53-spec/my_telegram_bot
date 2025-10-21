@@ -1,5 +1,6 @@
 import os
 import threading
+import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
@@ -16,11 +17,10 @@ TARGET_USERNAMES = ["Habib471"]
 SIGNATURE_USER = "Habib471"
 SIGNATURE_TEXT = "Полюби Апачи, как он тебя 💞"
 OWNER_USERNAME = "bxuwy"
-
 bot_active = True
 last_messages = {}
 
-# 💖 Простые романтические фразы (без эмодзи, 70+)
+# 💖 Простые романтические фразы (без эмодзи)
 LOVE_PHRASES = [
     "Ты мне дорог", "Я рад, что ты есть", "Ты особенная", "Ты мой человек",
     "С тобой спокойно", "Ты просто счастье", "Ты делаешь день лучше", "Ты важна",
@@ -80,7 +80,6 @@ LOVE_LEVELS = [
     (96, 100, "💍 Судьба связала вас — любовь навсегда."),
 ]
 
-# 🎁 Подарки
 GIFTS_ROMANTIC = [
     "💐 Букет слов и немного нежности",
     "🍫 Шоколад из чувства симпатии",
@@ -141,7 +140,7 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_active = False
     await update.message.reply_text("🔕 Бот выключен!")
 
-# 💘 Команда /love
+# 💘 Команда /love с красивым оформлением
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -150,11 +149,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target = args[1].replace("@", "") if len(args) > 1 else message.from_user.username
 
     score = random.randint(0, 100)
-    if target.lower() == SIGNATURE_USER.lower():
-        phrase = random.choice(SPECIAL_PHRASES)
-    else:
-        phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
-
+    phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
     category = next((label for (low, high, label) in LOVE_LEVELS if low <= score <= high), "💞 Нежные чувства")
     emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=4))
 
@@ -169,7 +164,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await message.reply_text(text_to_send)
 
-# 🎁 Команда /gift
+# 🎁 Команда /gift с анимацией
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -182,11 +177,25 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target = args[1].replace("@", "")
     gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
     gift = random.choice(gift_list)
+    sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} готовит подарок для @{target}...\n\nПодготовка...")
 
-    await message.reply_text(
-        f"🎁 @{message.from_user.username} дарит @{target} подарок:\n"
-        f"{gift}\n\n❤️ Пусть этот момент запомнится надолго!"
-    )
+    animation_frames = [
+        "🎁 [          ]",
+        "🎁 [■         ]",
+        "🎁 [■■        ]",
+        "🎁 [■■■       ]",
+        "🎁 [■■■■      ]",
+        "🎁 [■■■■■     ]",
+        "🎁 [■■■■■■    ]",
+        "🎁 [■■■■■■■   ]",
+        "🎁 [■■■■■■■■  ]",
+        "🎁 [■■■■■■■■■ ]",
+        f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}\n\n✨ Пусть этот момент запомнится надолго!"
+    ]
+
+    for frame in animation_frames:
+        await sent_msg.edit_text(frame)
+        await asyncio.sleep(0.2)
 
 # 💬 Реакция на сообщения выбранных пользователей
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
