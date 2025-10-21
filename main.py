@@ -147,6 +147,7 @@ def run_web():
             self.wfile.write(b"LoveBot is running <3")
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
+
 threading.Thread(target=run_web, daemon=True).start()
 
 # Команды
@@ -184,6 +185,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_messages[username] = phrase
             await message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
 
+# Улучшенная команда /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -191,25 +193,30 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = message.text.split(maxsplit=1)
     target = args[1] if len(args) > 1 else message.from_user.username
     score = random.randint(0, 100)
-    story_templates = [
-        f"💖 {target} встречается с тобой на {score}% волшебства 🌟✨💞",
-        f"💘 Судьба говорит, что с {target} вы на {score}% идеально вместе 🌈💖",
-        f"💞 Совместимость с {target}: {score}% 💫🌹",
-        f"💓 Любовь на {score}%! Вместе вы создаёте чудеса 🌟💖",
+    love_stories = [
+        f"💖 {target} однажды встретил(а) тебя в дождливый день, и мир заиграл цветами на {score}% 🌈",
+        f"💘 Судьба свела вас в парке, и с тех пор ваше сердце бьется на {score}% в унисон 🌟",
+        f"💞 На {score}% вы — как две половинки одного пазла 🧩💓",
+        f"💓 Ваши души переплелись на {score}% и вместе создают маленькие чудеса ✨🌸",
+        f"🌹 {target} приносит в твою жизнь {score}% счастья и бесконечную нежность 💫",
+        f"✨ Вы словно магниты на {score}% притягиваете друг друга 💞💖",
+        f"💫 Каждое мгновение с {target} наполняет твою жизнь радостью на {score}% 🌈",
     ]
-    story = random.choice(story_templates)
+    story = random.choice(love_stories)
     sent_message = await message.reply_text("💌 Подготавливаю романтику...")
     text_to_send = ""
-    emojis = ["💖","✨","🌹","💫","💓"]
+    emojis = ["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"]
     for char in story:
         text_to_send += char
         await sent_message.edit_text(text_to_send)
         await asyncio.sleep(0.03)
-    for _ in range(10):
+    for _ in range(15):
         text_to_send += random.choice(emojis)
         await sent_message.edit_text(text_to_send)
         await asyncio.sleep(0.1)
+    await sent_message.edit_text(f"{text_to_send}\n\n{SIGNATURE}")
 
+# Уведомление при старте
 async def notify_start(app):
     try:
         updates = await app.bot.get_updates(limit=100)
@@ -231,17 +238,16 @@ async def notify_start(app):
     except Exception as e:
         print("Ошибка уведомления при старте:", e)
 
-# Главный запуск
-if __name__ == "__main__":
+# Главная функция
+async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("love", love_command))
     app.add_handler(CommandHandler("on", bot_on))
     app.add_handler(CommandHandler("off", bot_off))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    
-    # Уведомление о запуске
-    asyncio.get_event_loop().create_task(notify_start(app))
-    
-    # Запуск бота
-    app.run_polling()
+    await notify_start(app)
+    await app.run_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main())
