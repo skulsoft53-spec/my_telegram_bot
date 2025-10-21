@@ -180,7 +180,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await sent_msg.edit_text(result_text)
 
-# 🎁 Команда /gift с ускоренной анимацией
+# 🎁 Команда /gift с мгновенной анимацией
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -192,25 +192,19 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target = args[1].replace("@", "")
     gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
     gift = random.choice(gift_list)
+
     sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} готовит подарок для @{target}...\n\nПодготовка...")
 
-    animation_frames = [
-        "🎁 [          ]",
-        "🎁 [■         ]",
-        "🎁 [■■        ]",
-        "🎁 [■■■       ]",
-        "🎁 [■■■■      ]",
-        "🎁 [■■■■■     ]",
-        "🎁 [■■■■■■    ]",
-        "🎁 [■■■■■■■   ]",
-        "🎁 [■■■■■■■■  ]",
-        "🎁 [■■■■■■■■■ ]",
-        f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}\n\n✨ Пусть этот момент запомнится надолго!"
-    ]
+    # мгновенная шкала
+    bar_length = 10
+    filled_length = random.randint(6, 10)
+    bar = "🎁" * filled_length + "⬜" * (bar_length - filled_length)
+    await sent_msg.edit_text(f"🎁 @{message.from_user.username} 💝 @{target}\n[{bar}]")
 
-    for frame in animation_frames:
-        await sent_msg.edit_text(frame)
-        await asyncio.sleep(0.02)  # ускоренная анимация
+    # финальный текст подарка
+    final_text = f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}\n\n✨ Пусть этот момент запомнится надолго!"
+    await asyncio.sleep(0.05)
+    await sent_msg.edit_text(final_text)
 
 # 💬 Реакция на сообщения выбранных пользователей
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
