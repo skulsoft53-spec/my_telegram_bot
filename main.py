@@ -20,6 +20,10 @@ OWNER_USERNAME = "bxuwy"
 bot_active = True
 last_messages = {}
 
+# 🔒 Ограничение одновременных задач
+MAX_CONCURRENT_TASKS = 10
+task_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+
 # 💖 Простые романтические фразы
 LOVE_PHRASES = [
     "Ты мне дорог", "Я рад, что ты есть", "Ты особенная", "Ты мой человек",
@@ -139,75 +143,74 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_active = False
     await update.message.reply_text("🔕 Бот выключен!")
 
-# 💘 /love с мгновенной шкалой
+# 💘 /love с параллельной обработкой
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
-    message = update.message
-    args = message.text.split(maxsplit=1)
-    target = args[1].replace("@", "") if len(args) > 1 else message.from_user.username
-    final_score = random.randint(0, 100)
-    phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
-    category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
-    sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n0% [----------]")
 
-    bar_length = 10
-    hearts = ["❤️", "💖", "💓", "💘"]
-    sparkles = ["✨", "💫", "🌸", "⭐"]
+    async def process_love():
+        async with task_semaphore:
+            message = update.message
+            args = message.text.split(maxsplit=1)
+            target = args[1].replace("@", "") if len(args) > 1 else message.from_user.username
+            final_score = random.randint(0, 100)
+            phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
+            category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
+            sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n0% [----------]")
 
-    filled_length = final_score * bar_length // 100
-    bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
-    flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
-    await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}] {flying_hearts}")
+            bar_length = 10
+            hearts = ["❤️", "💖", "💓", "💘"]
+            sparkles = ["✨", "💫", "🌸", "⭐"]
 
-    emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=6))
-    result_text = (
-        f"💞 @{message.from_user.username} 💖 @{target}\n"
-        f"🎯 Результат: {final_score}%\n"
-        f"{phrase}\n\nКатегория: {category} {emojis}"
-    )
-    if target.lower() == SIGNATURE_USER.lower():
-        result_text += f"\n\n{SIGNATURE_TEXT}"
+            # Быстро заполняем шкалу
+            filled_length = final_score * bar_length // 100
+            bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
+            flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
+            await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}] {flying_hearts}")
 
-    for _ in range(3):
-        mini_flash = "".join(random.choices(hearts + sparkles, k=random.randint(2, 5)))
-        await sent_msg.edit_text(f"{result_text}\n\n{mini_flash}")
-        await asyncio.sleep(0.05)
+            emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=6))
+            result_text = (
+                f"💞 @{message.from_user.username} 💖 @{target}\n"
+                f"🎯 Результат: {final_score}%\n"
+                f"{phrase}\n\nКатегория: {category} {emojis}"
+            )
+            if target.lower() == SIGNATURE_USER.lower():
+                result_text += f"\n\n{SIGNATURE_TEXT}"
 
-    await sent_msg.edit_text(result_text)
+            await sent_msg.edit_text(result_text)
 
-# 🎁 /gift с мгновенной шкалой и мини-вспышками
+    asyncio.create_task(process_love())
+
+# 🎁 /gift с параллельной обработкой
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
-    message = update.message
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
-        await message.reply_text("🎁 Используй: /gift @username")
-        return
-    target = args[1].replace("@", "")
-    gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
-    gift = random.choice(gift_list)
 
-    sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} готовит подарок для @{target}...\n\n0% [----------]")
+    async def process_gift():
+        async with task_semaphore:
+            message = update.message
+            args = message.text.split(maxsplit=1)
+            if len(args) < 2:
+                await message.reply_text("🎁 Используй: /gift @username")
+                return
+            target = args[1].replace("@", "")
+            gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
+            gift = random.choice(gift_list)
 
-    bar_length = 10
-    hearts = ["❤️", "💖", "💓", "💘"]
-    sparkles = ["✨", "💫", "🌸", "⭐"]
+            sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} готовит подарок для @{target}...\n\n0% [----------]")
 
-    # мгновенное заполнение шкалы
-    filled_length = bar_length
-    bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
-    flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(2, 4)))
-    await sent_msg.edit_text(f"🎁 @{message.from_user.username} 💖 @{target}\n100% [{bar}] {flying_hearts}")
+            bar_length = 10
+            hearts = ["❤️", "💖", "💓", "💘"]
+            sparkles = ["✨", "💫", "🌸", "⭐"]
 
-    # мини-вспышки
-    for _ in range(3):
-        mini_flash = "".join(random.choices(hearts + sparkles, k=random.randint(3, 6)))
-        await sent_msg.edit_text(f"🎁 @{message.from_user.username} 💖 @{target}\n{bar} {mini_flash}")
-        await asyncio.sleep(0.05)
+            filled_length = bar_length
+            bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
+            flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(2, 4)))
+            await sent_msg.edit_text(f"🎁 @{message.from_user.username} 💖 @{target}\n100% [{bar}] {flying_hearts}")
 
-    await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}\n\n✨ Пусть этот момент запомнится надолго!")
+            await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}\n\n✨ Пусть этот момент запомнится надолго!")
+
+    asyncio.create_task(process_gift())
 
 # 💬 Реакция на сообщения выбранных пользователей
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -220,12 +223,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not username:
         return
     if message.chat.type in ["group", "supergroup"] and username in TARGET_USERNAMES:
-        phrase = random.choice(SPECIAL_PHRASES)
-        while last_messages.get(username) == phrase:
-            phrase = random.choice(SPECIAL_PHRASES)
-        last_messages[username] = phrase
-        text_to_send = f"{phrase}\n\n{SIGNATURE_TEXT}"
-        await message.reply_text(text_to_send, reply_to_message_id=message.message_id)
+
+        async def process_message():
+            async with task_semaphore:
+                phrase = random.choice(SPECIAL_PHRASES)
+                while last_messages.get(username) == phrase:
+                    phrase = random.choice(SPECIAL_PHRASES)
+                last_messages[username] = phrase
+                text_to_send = f"{phrase}\n\n{SIGNATURE_TEXT}"
+                await message.reply_text(text_to_send, reply_to_message_id=message.message_id)
+
+        asyncio.create_task(process_message())
 
 # 🚀 Запуск
 def main():
