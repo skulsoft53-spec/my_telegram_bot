@@ -1,10 +1,10 @@
 import os
 import random
-import threading
 import asyncio
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Токен из переменной окружения
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -19,10 +19,11 @@ bot_active = True
 last_messages = {}
 users_sent_messages = set()
 
-# Пример фраз (твой полный список LOVE_PHRASES вставляй здесь)
+# Пример фраз
 LOVE_PHRASES = [
-    "Ты — моё вдохновение 🌸",
+    "Ты — моё вдохновение, дыхание весны 🌸",
     "С тобой каждый день — маленькое чудо ✨",
+    "Ты — моя мелодия счастья 🎶",
 ]
 
 LOVE_JOKES = [
@@ -62,21 +63,24 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔕 Бот выключен!")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not bot_active or not update.message or not update.message.from_user:
+    if not bot_active:
         return
-    username = update.message.from_user.username
+    message = update.message
+    if not message or not message.from_user:
+        return
+    username = message.from_user.username
     users_sent_messages.add(username)
-    if update.message.chat.type in ["group", "supergroup"]:
+    if message.chat.type in ["group", "supergroup"]:
         if username in TARGET_USERNAMES and random.random() < 0.3:
             phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
             while last_messages.get(username) == phrase:
                 phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
             last_messages[username] = phrase
-            await update.message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=update.message.message_id)
+            await message.reply_text(f"{phrase}\n\n{SIGNATURE}", reply_to_message_id=message.message_id)
 
 # Команда /love с анимацией
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not bot_active or not update.message:
+    if not bot_active:
         return
     message = update.message
     args = message.text.split(maxsplit=1)
@@ -84,23 +88,24 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     score = random.randint(0, 100)
 
     bar_length = 10
-    filled_length = score * bar_length // 100
-    bar = "█" * filled_length + "□" * (bar_length - filled_length)
+    bar = "□" * bar_length
 
     love_stories = [
-        f"💖 {target} встретил(а) тебя, и мир заиграл цветами на {score}% 🌈",
-        f"💘 Ваши сердца бьются на {score}% в унисон 🌟",
+        f"💖 {target} однажды встретил(а) тебя в дождливый день, и мир заиграл цветами на {score}% 🌈",
+        f"💞 На {score}% вы — как две половинки одного пазла 🧩💓",
     ]
     story = random.choice(love_stories)
 
-    sent_message = await message.reply_text(f"💌 Совместимость с {target}: 0%\n[{ '□'*10 }]")
+    sent_message = await message.reply_text(f"💌 Совместимость с {target}: 0%\n[{bar}]")
 
-    for i in range(1, score+1):
+    # Анимация прогресса
+    for i in range(1, score + 1):
         filled = i * bar_length // 100
         bar = "█" * filled + "□" * (bar_length - filled)
         await sent_message.edit_text(f"💌 Совместимость с {target}: {i}%\n[{bar}]")
         await asyncio.sleep(0.02)
 
+    # Анимация истории
     text_to_send = ""
     emojis = ["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"]
     for char in story:
@@ -114,11 +119,14 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await sent_message.edit_text(f"{text_to_send}\n\n{SIGNATURE}")
 
-# Уведомление при старте
+# Уведомление при старте для чатов и пользователей
 async def notify_start(app):
     try:
         updates = await app.bot.get_updates(limit=100)
-        chats = {u.message.chat.id for u in updates if u.message}
+        chats = set()
+        for u in updates:
+            if u.message:
+                chats.add(u.message.chat.id)
         for chat_id in chats:
             try:
                 await app.bot.send_message(chat_id=chat_id, text="💌 LoveBot запущен и онлайн!")
@@ -135,18 +143,17 @@ async def notify_start(app):
 
 # Главная функция
 async def main():
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    async with ApplicationBuilder().token(TELEGRAM_TOKEN).build() as app:
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("love", love_command))
+        app.add_handler(CommandHandler("on", bot_on))
+        app.add_handler(CommandHandler("off", bot_off))
+        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("love", love_command))
-    app.add_handler(CommandHandler("on", bot_on))
-    app.add_handler(CommandHandler("off", bot_off))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+        # Отправляем уведомления после запуска
+        asyncio.create_task(notify_start(app))
 
-    # Добавляем notify_start через post_init
-    app.post_init.append(notify_start)
-
-    await app.run_polling()
+        await app.run_polling()
 
 if __name__ == "__main__":
     asyncio.run(main())
