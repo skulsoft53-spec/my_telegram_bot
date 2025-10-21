@@ -140,7 +140,7 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_active = False
     await update.message.reply_text("🔕 Бот выключен!")
 
-# 💘 Команда /love
+# 💘 Команда /love с мгновенной шкалой
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
@@ -156,12 +156,12 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bar_length = 10
     hearts = ["❤️", "💖", "💓", "💘"]
     sparkles = ["✨", "💫", "🌸", "⭐"]
-    for i in range(final_score + 1):
-        filled_length = i * bar_length // 100
-        bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
-        flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
-        await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{i}% [{bar}] {flying_hearts}")
-        await asyncio.sleep(0.1)
+
+    # Мгновенное заполнение шкалы
+    filled_length = final_score * bar_length // 100
+    bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
+    flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
+    await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}] {flying_hearts}")
 
     emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=6))
     result_text = (
@@ -172,21 +172,13 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target.lower() == SIGNATURE_USER.lower():
         result_text += f"\n\n{SIGNATURE_TEXT}"
 
+    # Мини-вспышка для красоты
+    for _ in range(3):
+        mini_flash = "".join(random.choices(hearts + sparkles, k=random.randint(2, 5)))
+        await sent_msg.edit_text(f"{result_text}\n\n{mini_flash}")
+        await asyncio.sleep(0.05)
+
     await sent_msg.edit_text(result_text)
-
-    for wave in range(8):
-        lines = [""] * 6
-        for _ in range(12):
-            line_index = random.randint(0, 5)
-            lines[line_index] += random.choice(hearts + sparkles)
-        flying_text = "\n".join(lines)
-        await sent_msg.edit_text(f"{result_text}\n\n{flying_text}")
-        await asyncio.sleep(0.1)
-
-    for i in range(3):
-        last_hearts = "\n".join(["❤️" * random.randint(1, 4) for _ in range(5)])
-        await sent_msg.edit_text(f"{result_text}\n\n{last_hearts}")
-        await asyncio.sleep(0.1)
 
 # 🎁 Команда /gift
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
