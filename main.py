@@ -78,13 +78,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
         "Команды:\n"
-        ".love /love love — проверить совместимость 💘\n"
-        ".gift /gift gift — подарить подарок 🎁\n"
-        ".trollsave /trollsave trollsave — сохранить шаблон 📝\n"
-        ".troll /troll troll — печать шаблона лесенкой 🪜 (только владелец)\n"
-        ".trollstop /trollstop trollstop — остановка троллинга 🛑\n"
-        ".onbot/.offbot /onbot /offbot — включить/выключить бота (только создатель)\n"
-        ".all /all all <текст> — отправка всем (только владелец)"
+        "/love — проверить совместимость 💘\n"
+        "/gift — подарить подарок 🎁\n"
+        "/trollsave — сохранить шаблон 📝\n"
+        "/troll — печать шаблона лесенкой 🪜 (только владелец)\n"
+        "/trollstop — остановка троллинга 🛑\n"
+        "/onbot /offbot — включить/выключить бота (только создатель)\n"
+        "/all <текст> — отправка всем (только владелец)"
     )
 
 async def bot_off_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -109,71 +109,67 @@ async def bot_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 💘 love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        if not bot_active:
-            return
-        async with task_semaphore:
-            message = update.message
-            args = message.text.split(maxsplit=1)
-            target = args[1].replace("@", "") if len(args) > 1 else message.from_user.username
-            final_score = random.randint(0, 100)
-            hearts = ["❤️", "💖", "💘", "💞"]
-            sparkles = ["✨", "💫", "🌸", "⭐"]
-            bar_length = 20
-            filled_length = final_score * bar_length // 100
-            bar = "".join(random.choices(hearts + sparkles, k=filled_length)) + "🖤" * (bar_length - filled_length)
-            sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}]")
-            for _ in range(3):
-                anim_bar = "".join(random.choices(hearts + sparkles, k=filled_length)) + "🖤" * (bar_length - filled_length)
-                await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{anim_bar}]")
-                await asyncio.sleep(0.2)
-            phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
-            category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
-            result_text = f"💞 @{message.from_user.username} 💖 @{target}\n🎯 Результат: {final_score}% [{bar}]\n{phrase}\n\nКатегория: {category}"
-            if target.lower() == SIGNATURE_USER.lower():
-                result_text += f"\n\n{SIGNATURE_TEXT}"
-            await sent_msg.edit_text(result_text)
-            await send_log(context, f"love: @{message.from_user.username} 💖 @{target} = {final_score}%")
-    except Exception:
-        await send_log(context, f"Ошибка в love: {traceback.format_exc()}")
+    if not bot_active:
+        return
+    async with task_semaphore:
+        message = update.message
+        args = message.text.split(maxsplit=1)
+        target = args[1].replace("@", "") if len(args) > 1 else message.from_user.username
+        final_score = random.randint(0, 100)
+        hearts = ["❤️", "💖", "💘", "💞"]
+        sparkles = ["✨", "💫", "🌸", "⭐"]
+        bar_length = 20
+        filled_length = final_score * bar_length // 100
+        bar = "".join(random.choices(hearts + sparkles, k=filled_length)) + "🖤" * (bar_length - filled_length)
+        sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}]")
+        for _ in range(3):
+            anim_bar = "".join(random.choices(hearts + sparkles, k=filled_length)) + "🖤" * (bar_length - filled_length)
+            await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{anim_bar}]")
+            await asyncio.sleep(0.2)
+        phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
+        category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
+        result_text = f"💞 @{message.from_user.username} 💖 @{target}\n🎯 Результат: {final_score}% [{bar}]\n{phrase}\n\nКатегория: {category}"
+        if target.lower() == SIGNATURE_USER.lower():
+            result_text += f"\n\n{SIGNATURE_TEXT}"
+        await sent_msg.edit_text(result_text)
+        await send_log(context, f"love: @{message.from_user.username} 💖 @{target} = {final_score}%")
 
 # 🎁 gift
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        if not bot_active:
-            return
-        async with task_semaphore:
-            message = update.message
-            args = message.text.split(maxsplit=1)
-            if len(args) < 2:
-                await message.reply_text("🎁 Используй: gift @username")
-                return
-            target = args[1].replace("@", "")
-            gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
-            gift = random.choice(gift_list)
-            sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 …")
-            for _ in range(3):
-                await asyncio.sleep(0.2)
-                await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 🎉")
-            await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
-            await send_log(context, f"gift: @{message.from_user.username} → @{target} ({gift})")
-    except Exception:
-        await send_log(context, f"Ошибка в gift: {traceback.format_exc()}")
-
-# 💾 trollsave без ограничения длины
-async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        global saved_troll_template
-        if update.message.from_user.username != OWNER_USERNAME:
-            return
-        args = update.message.text.split(maxsplit=1)
+    if not bot_active:
+        return
+    async with task_semaphore:
+        message = update.message
+        args = message.text.split(maxsplit=1)
         if len(args) < 2:
+            await message.reply_text("🎁 Используй: /gift @username")
             return
-        text = args[1].strip()
-        saved_troll_template = text.split("\n") if "\n" in text else [text]
-        await update.message.delete()
-    except Exception as e:
-        await send_log(context, f"Ошибка в trollsave_command: {e}")
+        target = args[1].replace("@", "")
+        gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
+        gift = random.choice(gift_list)
+        sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 …")
+        for _ in range(3):
+            await asyncio.sleep(0.2)
+            await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 🎉")
+        await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
+        await send_log(context, f"gift: @{message.from_user.username} → @{target} ({gift})")
+
+# 💾 trollsave с авторазбивкой на строки
+async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global saved_troll_template
+    if update.message.from_user.username != OWNER_USERNAME:
+        return
+    args = update.message.text.split(maxsplit=1)
+    if len(args) < 2:
+        return
+    text = args[1].strip()
+    # Авторазделение на строки по \n или по 40 символов
+    if "\n" in text:
+        saved_troll_template = text.split("\n")
+    else:
+        max_len = 40
+        saved_troll_template = [text[i:i+max_len] for i in range(0, len(text), max_len)]
+    await update.message.delete()
 
 # 🪜 troll
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -200,11 +196,11 @@ async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     troll_stop = True
 
-# .all
+# /all
 async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.username != OWNER_USERNAME:
         return
-    text = re.sub(r'^([/.]?all)\s+', '', update.message.text, flags=re.I).strip()
+    text = re.sub(r'^/all\s+', '', update.message.text, flags=re.I).strip()
     if not text:
         await update.message.reply_text("❌ Текст для отправки не указан.")
         return
@@ -217,25 +213,22 @@ async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 💬 Логирование сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        last_messages[update.message.chat.id] = update.message.chat.id
-        if not bot_active:
-            await update.message.reply_text("⚠️ Бот временно отключен.")
-    except Exception:
-        await send_log(context, f"Ошибка handle_message: {traceback.format_exc()}")
+    last_messages[update.message.chat.id] = update.message.chat.id
+    if not bot_active:
+        await update.message.reply_text("⚠️ Бот временно отключен.")
 
 # 🚀 Запуск
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(MessageHandler(filters.Regex(r'^[/\.]?start$'), start))
-    app.add_handler(MessageHandler(filters.Regex(r'^[/\.]?onbot$'), bot_on_command))
-    app.add_handler(MessageHandler(filters.Regex(r'^[/\.]?offbot$'), bot_off_command))
-    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?love|love)'), love_command))
-    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?gift|gift)'), gift_command))
-    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?trollsave|trollsave)'), trollsave_command))
-    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?troll|troll)'), troll_command))
-    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?trollstop|trollstop)'), trollstop_command))
-    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?all|all)'), all_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/start$'), start))
+    app.add_handler(MessageHandler(filters.Regex(r'^/onbot$'), bot_on_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/offbot$'), bot_off_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/love'), love_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/gift'), gift_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/trollsave'), trollsave_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/troll$'), troll_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/trollstop$'), trollstop_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^/all'), all_command))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     print("✅ Бот запущен!")
     app.run_polling()
