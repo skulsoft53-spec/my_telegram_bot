@@ -163,16 +163,13 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
             category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
             sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n0% [----------]")
-
             bar_length = 10
             hearts = ["❤️", "💖", "💓", "💘"]
             sparkles = ["✨", "💫", "🌸", "⭐"]
-
             filled_length = final_score * bar_length // 100
             bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
             flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
             await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}] {flying_hearts}")
-
             emojis = "".join(random.choices(["💖", "✨", "🌹", "💫", "💓", "🌸", "⭐"], k=6))
             result_text = (
                 f"💞 @{message.from_user.username} 💖 @{target}\n"
@@ -181,7 +178,6 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             if target.lower() == SIGNATURE_USER.lower():
                 result_text += f"\n\n{SIGNATURE_TEXT}"
-
             await sent_msg.edit_text(result_text)
     asyncio.create_task(process_love())
 
@@ -231,7 +227,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await message.reply_text(text_to_send, reply_to_message_id=message.message_id)
         asyncio.create_task(process_message())
 
-# 💾 /trollsave
+# 💾 /trollsave — сохранить шаблон (только для владельца)
 async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global saved_troll_template
     if update.message.from_user.username != OWNER_USERNAME:
@@ -241,10 +237,10 @@ async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 2:
         await update.message.reply_text("❌ Используй: /trollsave <текст>")
         return
-    saved_troll_template = args[1]
-    await update.message.reply_text(f"✅ Шаблон сохранён: {saved_troll_template}")
+    saved_troll_template = args[1].replace("\\n", "\n")  # поддержка нескольких строк
+    await update.message.reply_text(f"✅ Шаблон сохранён:\n{saved_troll_template}")
 
-# 🪜 /troll — быстрый лесенкой (только владелец)
+# 🪜 /troll — печать лесенкой по строкам (только для владельца)
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
     if update.message.from_user.username != OWNER_USERNAME:
@@ -254,40 +250,22 @@ async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет сохранённого шаблона. Используй /trollsave <текст>")
         return
 
-    async def send_ladder_fast():
+    async def send_ladder():
         global troll_stop
         async with task_semaphore:
             troll_stop = False
             message = update.message
-            words = saved_troll_template.split()
-            current_line = []
-
-            for word in words:
+            lines = saved_troll_template.split("\n")
+            for line in lines:
                 if troll_stop:
                     await message.reply_text("🛑 Троллинг остановлен.")
                     break
+                await message.reply_text(line)
+                await asyncio.sleep(0.05)
 
-                current_line.append(word)
-                line_text = " ".join(current_line)
+    asyncio.create_task(send_ladder())
 
-                typed_text = ""
-                for char in line_text:
-                    if troll_stop:
-                        await message.reply_text("🛑 Троллинг остановлен.")
-                        return
-                    typed_text += char
-                    await asyncio.sleep(0.005)
-                    try:
-                        await message.edit_text(typed_text)
-                    except:
-                        await message.reply_text(typed_text)
-
-                await asyncio.sleep(0.01)
-
-    sent_msg = await update.message.reply_text("...")
-    asyncio.create_task(send_ladder_fast())
-
-# 🛑 /trollstop — остановка троллинга (только владелец)
+# 🛑 /trollstop — остановка троллинга (только для владельца)
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
     if update.message.from_user.username != OWNER_USERNAME:
