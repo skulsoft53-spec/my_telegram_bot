@@ -21,7 +21,7 @@ OWNER_USERNAME = "bxuwy"
 LOG_CHANNEL_ID = -1003107269526  # Канал для логов
 bot_active = True
 updating = False
-last_messages = {}
+last_messages = {}  # для хранения чатов и ЛС
 
 # 🔒 Ограничение одновременных задач
 MAX_CONCURRENT_TASKS = 10
@@ -95,7 +95,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/trollsave — сохранить шаблон 📝\n"
         "/troll — печать шаблона лесенкой 🪜 (только владелец)\n"
         "/trollstop — остановка троллинга 🛑\n"
-        "/onbot и /offbot — включить/выключить бота (только создатель)."
+        "/onbot и /offbot — включить/выключить бота (только создатель).\n"
+        ".all — рассылка всем чатам/ЛС (только владелец)"
     )
 
 # 🔘 /onbot и /offbot
@@ -139,22 +140,17 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             bar_length = 20
             filled_length = final_score * bar_length // 100
-
-            # Мгновенное заполнение шкалы с рандомными сердцами
             bar = "".join(random.choices(hearts + sparkles, k=filled_length)) + "🖤" * (bar_length - filled_length)
 
             sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}]")
 
-            # Лёгкая анимация мерцающих сердец (3 раза)
             for _ in range(3):
                 anim_bar = "".join(random.choices(hearts + sparkles, k=filled_length)) + "🖤" * (bar_length - filled_length)
                 await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{anim_bar}]")
                 await asyncio.sleep(0.2)
 
-            # Итоговое сообщение
             phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
             category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
-
             result_text = (
                 f"💞 @{message.from_user.username} 💖 @{target}\n"
                 f"🎯 Результат: {final_score}% [{bar}]\n"
@@ -189,7 +185,6 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             gift = random.choice(gift_list)
 
             sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 …")
-            # Анимация "дарения"
             for _ in range(3):
                 await asyncio.sleep(0.2)
                 await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 🎉")
@@ -211,7 +206,7 @@ async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     saved_troll_template = args[1].split("\\n")
     await update.message.reply_text(f"✅ Шаблон сохранён с {len(saved_troll_template)} строками.")
 
-# 🪜 /troll — супербыстро
+# 🪜 /troll — ускоренный и не отвечает инициатору
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
     if update.message.from_user.username != OWNER_USERNAME:
@@ -228,9 +223,9 @@ async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for line in saved_troll_template:
                 if troll_stop:
                     break
-                # 🔥 не отвечаем на сообщение, которое запустило команду
-                await context.bot.send_message(chat_id=update.effective_chat.id, text=line)
-                await asyncio.sleep(0.01)  # супербыстрая отправка
+                if line.strip():
+                    await context.bot.send_message(chat_id=update.effective_chat.id, text=line)
+                await asyncio.sleep(0.05)  # минимальная задержка
 
     asyncio.create_task(send_ladder())
 
@@ -243,11 +238,36 @@ async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     troll_stop = True
     await update.message.reply_text("🛑 Троллинг остановлен.")
 
+# 📢 .all — рассылка всем чатам/ЛС (только владельцу)
+async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        return
+    args = update.message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await update.message.reply_text("❌ Используй: .all <текст>")
+        return
+    text_to_send = args[1]
+
+    sent_count = 0
+    async with task_semaphore:
+        chat_ids = set(last_messages.keys())
+        for chat_id in chat_ids:
+            try:
+                await context.bot.send_message(chat_id=chat_id, text=text_to_send)
+                sent_count += 1
+                await asyncio.sleep(0.05)
+            except Exception as e:
+                print(f"Ошибка при отправке в чат {chat_id}: {e}")
+        await update.message.reply_text(f"✅ Отправлено в {sent_count} чатов/ЛС.")
+        await send_log(context, f".all от @{OWNER_USERNAME}: {text_to_send}")
+
 # 💬 Логируем любые сообщения и ошибки
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user = update.message.from_user.username
         text = update.message.text
+        last_messages[update.effective_chat.id] = user  # сохраняем чат для .all
         if user != OWNER_USERNAME:
             await send_log(context, f"Сообщение от @{user}: {text}")
         if not bot_active and updating:
@@ -255,9 +275,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         await send_log(context, f"Ошибка при обработке сообщения от @{update.message.from_user.username}:\n{traceback.format_exc()}")
 
-# 🚀 Запуск
-def main():
+# 🔧 Основной запуск бота
+async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("onbot", bot_on_command))
     app.add_handler(CommandHandler("offbot", bot_off_command))
@@ -267,8 +288,10 @@ def main():
     app.add_handler(CommandHandler("troll", troll_command))
     app.add_handler(CommandHandler("trollstop", trollstop_command))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    app.add_handler(MessageHandler(filters.Regex(r'^\.all'), all_command))
+
     print("🚀 Бот запущен!")
-    app.run_polling()
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
