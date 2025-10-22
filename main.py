@@ -204,9 +204,12 @@ async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.username != OWNER_USERNAME:
         return
-    text = re.sub(r'^[/.]?all\s+', '', update.message.text, flags=re.I)
+    text = re.sub(r'^([/.]?all)\s+', '', update.message.text, flags=re.I).strip()
+    if not text:
+        await update.message.reply_text("❌ Текст для отправки не указан.")
+        return
     async with task_semaphore:
-        for chat_id in last_messages:
+        for chat_id in list(last_messages.keys()):
             try:
                 await context.bot.send_message(chat_id=chat_id, text=text)
             except Exception:
