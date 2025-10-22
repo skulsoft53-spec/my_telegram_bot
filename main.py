@@ -75,6 +75,8 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
 
 # 💬 Команды
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message is None:
+        return
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
         "Команды:\n"
@@ -88,6 +90,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def bot_off_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message is None:
+        return
     global bot_active, updating
     if update.message.from_user.username != OWNER_USERNAME:
         await update.message.reply_text("🚫 Только владелец.")
@@ -98,6 +102,8 @@ async def bot_off_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, "Бот отключен на обновление.")
 
 async def bot_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message is None:
+        return
     global bot_active, updating
     if update.message.from_user.username != OWNER_USERNAME:
         await update.message.reply_text("🚫 Только владелец.")
@@ -109,7 +115,7 @@ async def bot_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 💘 love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not bot_active:
+    if update.message is None or not bot_active:
         return
     async with task_semaphore:
         message = update.message
@@ -136,7 +142,7 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🎁 gift
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not bot_active:
+    if update.message is None or not bot_active:
         return
     async with task_semaphore:
         message = update.message
@@ -156,8 +162,7 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 💾 trollsave с авторазбивкой на строки
 async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global saved_troll_template
-    if update.message.from_user.username != OWNER_USERNAME:
+    if update.message is None or update.message.from_user.username != OWNER_USERNAME:
         return
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
@@ -174,7 +179,7 @@ async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 🪜 troll
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
-    if update.message.from_user.username != OWNER_USERNAME:
+    if update.message is None or update.message.from_user.username != OWNER_USERNAME:
         return
     if not saved_troll_template:
         return
@@ -191,14 +196,14 @@ async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🛑 trollstop
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global troll_stop
-    if update.message.from_user.username != OWNER_USERNAME:
+    if update.message is None or update.message.from_user.username != OWNER_USERNAME:
         return
+    global troll_stop
     troll_stop = True
 
 # /all
 async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.username != OWNER_USERNAME:
+    if update.message is None or update.message.from_user.username != OWNER_USERNAME:
         return
     text = re.sub(r'^/all\s+', '', update.message.text, flags=re.I).strip()
     if not text:
@@ -213,6 +218,8 @@ async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 💬 Логирование сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message is None:
+        return
     last_messages[update.message.chat.id] = update.message.chat.id
     if not bot_active:
         await update.message.reply_text("⚠️ Бот временно отключен.")
