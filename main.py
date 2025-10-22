@@ -211,7 +211,7 @@ async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     saved_troll_template = args[1].split("\\n")
     await update.message.reply_text(f"✅ Шаблон сохранён с {len(saved_troll_template)} строками.")
 
-# 🪜 /troll — экстремально быстрая версия
+# 🪜 /troll — супербыстро
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
     if update.message.from_user.username != OWNER_USERNAME:
@@ -221,20 +221,18 @@ async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет сохранённого шаблона.")
         return
 
-    async def send_ladder_extreme():
+    async def send_ladder():
         global troll_stop
-        troll_stop = False
-        tasks = []
+        async with task_semaphore:
+            troll_stop = False
+            for line in saved_troll_template:
+                if troll_stop:
+                    break
+                # 🔥 не отвечаем на сообщение, которое запустило команду
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=line)
+                await asyncio.sleep(0.01)  # супербыстрая отправка
 
-        for line in saved_troll_template:
-            if troll_stop:
-                break
-            tasks.append(asyncio.create_task(update.message.reply_text(line)))
-            await asyncio.sleep(0.01)
-
-        await asyncio.gather(*tasks, return_exceptions=True)
-
-    asyncio.create_task(send_ladder_extreme())
+    asyncio.create_task(send_ladder())
 
 # 🛑 /trollstop
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
