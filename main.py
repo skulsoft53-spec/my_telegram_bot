@@ -17,6 +17,7 @@ print("✅ TELEGRAM_TOKEN найден, бот запускается...")
 SIGNATURE_USER = "Habib471"
 SIGNATURE_TEXT = "Полюби Апачи, как он тебя 💞"
 OWNER_USERNAME = "bxuwy"
+OWNER_ID = 8486672898  # Твой ID
 LOG_CHANNEL_ID = -1003107269526
 bot_active = True
 updating = False
@@ -92,19 +93,19 @@ async def bot_off_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None:
         return
     global bot_active, updating
-    if update.message.from_user.username != OWNER_USERNAME:
+    if update.message.from_user.id != OWNER_ID:
         await update.message.reply_text("🚫 Только владелец.")
         return
     bot_active = False
     updating = True
-    await update.message.reply_text("⚠️ Бот отключен — он теперь отвечает только на команды.")
+    await update.message.reply_text("⚠️ Бот отключен — теперь отвечает только на команды.")
     await send_log(context, "Бот отключен на обновление.")
 
 async def bot_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None:
         return
     global bot_active, updating
-    if update.message.from_user.username != OWNER_USERNAME:
+    if update.message.from_user.id != OWNER_ID:
         await update.message.reply_text("🚫 Только владелец.")
         return
     bot_active = True
@@ -162,7 +163,7 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 💾 trollsave
 async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global saved_troll_template
-    if update.message is None or update.message.from_user.username != OWNER_USERNAME:
+    if update.message is None or update.message.from_user.id != OWNER_ID:
         return
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
@@ -178,7 +179,7 @@ async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 🪜 troll
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
-    if update.message is None or update.message.from_user.username != OWNER_USERNAME:
+    if update.message is None or update.message.from_user.id != OWNER_ID:
         return
     if not saved_troll_template:
         return
@@ -198,14 +199,14 @@ async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 🛑 trollstop
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
-    if update.message is None or update.message.from_user.username != OWNER_USERNAME:
+    if update.message is None or update.message.from_user.id != OWNER_ID:
         return
     troll_stop = True
     await update.message.reply_text("🛑 Троллинг остановлен!")
 
 # /all
 async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message is None or update.message.from_user.username != OWNER_USERNAME:
+    if update.message is None or update.message.from_user.id != OWNER_ID:
         return
     text = re.sub(r'^/all\s+', '', update.message.text, flags=re.I).strip()
     if not text:
@@ -223,7 +224,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None:
         return
     last_messages[update.message.chat.id] = update.message.chat.id
-    # Если бот выключен, не отвечаем на обычные сообщения, только на команды
+    # Если бот выключен, не отвечает на обычные сообщения, только на команды
     if not bot_active and not update.message.text.startswith("/"):
         return
 
