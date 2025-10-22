@@ -11,45 +11,45 @@ from telegram.ext import (
 )
 
 # -----------------------
-# 🔑  Конфигурация
+# 🔑 Конфигурация
 # -----------------------
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
     raise RuntimeError("Ошибка: TELEGRAM_TOKEN не установлен!")
 
-OWNER_ID = 8486672898          # <-- твой Telegram ID
+OWNER_ID = 8486672898
 LOG_CHANNEL_ID = -1003107269526
 bot_active = True
 
 # Хранилище
-last_messages = {}
-saved_troll_template = None
-troll_stop = False
+last_messages = {}  # chat_id -> chat_id (для /all)
 
-# -----------------------
-# Тексты
-# -----------------------
+# Тексты для /love и /gift
 LOVE_PHRASES = [
-    "Ты мне дорог 💞", "Я рад, что ты есть 💫", "Ты особенная 💖", "Ты мой человек 💕",
-    "С тобой спокойно 🌷", "Ты просто счастье 🌙", "Ты делаешь день лучше ☀️", "Ты важна 💝",
-    "Ты мой уют 💗", "Ты как свет ✨", "Ты делаешь меня лучше 💐", "Ты моя радость 🌸",
-    "Ты моё вдохновение 💓", "Ты просто прекрасна 💞", "Ты моё всё 💘"
+    "Ты мне дорог", "Я рад, что ты есть", "Ты особенная", "Ты мой человек",
+    "С тобой спокойно", "Ты просто счастье", "Ты делаешь день лучше", "Ты важна",
+    "Ты мой уют", "Ты как свет", "Ты делаешь меня лучше", "С тобой всё по-другому",
+    "Ты моя радость", "Ты моё вдохновение", "Ты просто прекрасна", "Ты моё всё",
+]
+SPECIAL_PHRASES = [
+    "С тобой даже тишина звучит красиво 💫",
+    "Ты — причина чьей-то улыбки 💖",
 ]
 LOVE_JOKES = ["Ты как Wi-Fi — рядом, и всё идеально 😄"]
 LOVE_LEVELS = [
-    (0, 10, "💔 Лёд между сердцами... но шанс есть."),
+    (0, 10, "💔 Лёд между сердцами... но всё ещё есть шанс."),
     (11, 25, "🌧️ Едва заметная искра."),
     (26, 45, "💫 Симпатия растёт."),
     (46, 65, "💞 Нежное притяжение."),
     (66, 80, "💖 Сердца бьются в унисон."),
     (81, 95, "💘 Это почти любовь."),
-    (96, 100, "💍 Любовь навсегда."),
+    (96, 100, "💍 Судьба связала вас — любовь навсегда."),
 ]
 GIFTS_ROMANTIC = ["💐 Букет слов и немного нежности", "🍫 Шоколад из чувства симпатии"]
 GIFTS_FUNNY = ["🍕 Один кусочек любви и три крошки заботы", "🍟 Картошка с соусом симпатии"]
 
 # -----------------------
-# Мини-вебсервер (для Render)
+# Мини-вебсервер (Render)
 # -----------------------
 def run_web():
     class Handler(BaseHTTPRequestHandler):
@@ -63,7 +63,7 @@ def run_web():
 threading.Thread(target=run_web, daemon=True).start()
 
 # -----------------------
-# Вспомогательные функции
+# Вспомогательные
 # -----------------------
 async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
     try:
@@ -72,165 +72,150 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
     except Exception:
         print("LOG:", text)
 
-def split_smart_into_lines(text: str):
-    """Разделяем текст шаблона на строки (если нет переносов — каждые 30-40 слов)."""
-    if "\n" in text:
-        return [ln.strip() for ln in text.split("\n") if ln.strip()]
-    words = text.split()
-    lines, i = [], 0
-    step = random.randint(30, 40)
-    while i < len(words):
-        lines.append(" ".join(words[i:i+step]))
-        i += step
-    return lines
-
 # -----------------------
-# Команды управления
-# -----------------------
-async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global bot_active
-    if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text("🚫 Только владелец.")
-    bot_active = True
-    await update.message.reply_text("🔔 Бот снова активен!")
-
-async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global bot_active
-    if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text("🚫 Только владелец.")
-    bot_active = False
-    await update.message.reply_text("⚠️ Бот отключён — отвечает только на команды.")
-
-# -----------------------
-# /trollsave — сохраняем шаблон
-# -----------------------
-async def trollsave_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global saved_troll_template
-    if update.effective_user.id != OWNER_ID:
-        return
-    parts = update.message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        return await update.message.reply_text("❌ Используй: /trollsave <текст>")
-    text = parts[1].strip()
-    saved_troll_template = split_smart_into_lines(text)
-    await update.message.reply_text(f"✅ Шаблон сохранён: {len(saved_troll_template)} строк.")
-    try:
-        await update.message.delete()
-    except:
-        pass
-
-# -----------------------
-# /troll — быстрая “лесенка”
-# -----------------------
-async def troll_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global troll_stop, saved_troll_template
-    if update.effective_user.id != OWNER_ID:
-        return
-    if not saved_troll_template:
-        return await update.message.reply_text("❌ Нет шаблона. Используй /trollsave.")
-    troll_stop = False
-    try:
-        await update.message.delete()
-    except:
-        pass
-    chat_id = update.effective_chat.id
-    for line in saved_troll_template:
-        if troll_stop:
-            break
-        try:
-            await context.bot.send_message(chat_id=chat_id, text=line)
-        except Exception as e:
-            print("Ошибка /troll:", e)
-        await asyncio.sleep(0.02)
-    if not troll_stop:
-        await context.bot.send_message(chat_id=chat_id, text="✅ Троллинг завершён 💞")
-
-# -----------------------
-# /trollstop
-# -----------------------
-async def trollstop_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global troll_stop
-    if update.effective_user.id != OWNER_ID:
-        return
-    troll_stop = True
-    await update.message.reply_text("🛑 Троллинг остановлен!")
-
-# -----------------------
-# /all — рассылка
-# -----------------------
-async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return
-    text = re.sub(r'^/all\s+', '', update.message.text).strip()
-    if not text:
-        return await update.message.reply_text("❌ Введи текст: /all <текст>")
-    count = 0
-    for chat_id in list(last_messages.keys()):
-        try:
-            await context.bot.send_message(chat_id=chat_id, text=text)
-            count += 1
-            await asyncio.sleep(0.05)
-        except:
-            continue
-    await update.message.reply_text(f"✅ Рассылка завершена ({count} чатов).")
-
-# -----------------------
-# /love — проверка совместимости
+# /love — супер эффект с лесенкой и мигающими сердцами
 # -----------------------
 async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not bot_active:
+    if update.message is None or not bot_active:
         return
-    args = update.message.text.split(maxsplit=1)
-    initiator = update.effective_user.username or update.effective_user.first_name
-    target = args[1].replace("@", "") if len(args) > 1 else initiator
-    score = random.randint(0, 100)
-    bars = "❤️" * (score // 10) + "🖤" * (10 - score // 10)
-    phrase = random.choice(LOVE_PHRASES + LOVE_JOKES)
-    level = next((lbl for lo, hi, lbl in LOVE_LEVELS if lo <= score <= hi), "")
-    await update.message.reply_text(
-        f"💞 @{initiator} 💖 @{target}\n"
-        f"Совместимость: {score}% [{bars}]\n"
-        f"{phrase}\n{level}"
-    )
+    try:
+        args = update.message.text.split(maxsplit=1)
+        initiator = update.effective_user.username or update.effective_user.first_name
+        target = args[1].replace("@", "") if len(args) > 1 else initiator
+        score = random.randint(0, 100)
+
+        # Базовые символы
+        hearts = ["❤️", "💖", "💘", "💞", "💝", "❣️"]
+        sparkles = ["✨", "💫", "🌸", "⭐"]
+        bar_len = 20
+
+        # стартовое сообщение
+        msg = await update.message.reply_text(f"💞 @{initiator} 💖 @{target}\n[{''.join(['🖤']*bar_len)}] 0%")
+
+        # Диагональная лесенка
+        for step in range(bar_len):
+            line = " " * step + random.choice(hearts + sparkles) * (bar_len - step)
+            percent = step * 100 // bar_len
+            text = f"💞 @{initiator} 💖 @{target}\n{line} {percent}%"
+
+            # каждая 3-я строка — романтическая фраза
+            if step % 3 == 0:
+                phrase = random.choice(LOVE_PHRASES + LOVE_JOKES + SPECIAL_PHRASES)
+                text += f"\n{phrase}"
+
+            try:
+                await msg.edit_text(text)
+            except Exception:
+                pass
+            await asyncio.sleep(0.12)
+
+        # Финальная пульсация
+        for _ in range(6):
+            line = "".join(random.choice(hearts + sparkles) for _ in range(bar_len))
+            phrase = random.choice(LOVE_PHRASES + LOVE_JOKES + SPECIAL_PHRASES)
+            category = next((lbl for (lo, hi, lbl) in LOVE_LEVELS if lo <= score <= hi), "💞 Нежные чувства")
+            final_text = f"💞 @{initiator} 💖 @{target}\n{line}\n{phrase}\n\nКатегория: {category}"
+            try:
+                await msg.edit_text(final_text)
+            except Exception:
+                pass
+            await asyncio.sleep(0.25)
+
+        await send_log(context, f"/love: @{initiator} -> @{target} = {score}%")
+
+    except Exception as e:
+        print("Ошибка /love:", e)
+        await send_log(context, f"Ошибка /love: {e}")
 
 # -----------------------
 # /gift — подарок
 # -----------------------
 async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not bot_active:
+    if update.message is None or not bot_active:
         return
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
-        return await update.message.reply_text("🎁 Используй: /gift @username")
+        await update.message.reply_text("🎁 Используй: /gift @username")
+        return
     giver = update.effective_user.username or update.effective_user.first_name
     target = args[1].replace("@", "")
-    gift = random.choice(GIFTS_ROMANTIC + GIFTS_FUNNY)
-    await update.message.reply_text(f"🎁 @{giver} дарит @{target} подарок:\n{gift}")
+    gift = random.choice(GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY)
+    msg = await update.message.reply_text(f"🎁 @{giver} дарит @{target} подарок:\n🎁 …")
+    for _ in range(2):
+        await asyncio.sleep(0.15)
+        try:
+            await msg.edit_text(f"🎁 @{giver} дарит @{target} подарок:\n🎁 🎉")
+        except Exception:
+            pass
+    try:
+        await msg.edit_text(f"🎁 @{giver} дарит @{target} подарок:\n{gift}")
+    except Exception:
+        pass
+    await send_log(context, f"/gift: @{giver} -> @{target} ({gift})")
+
+# -----------------------
+# /all — рассылка
+# -----------------------
+async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message is None or update.effective_user.id != OWNER_ID:
+        return
+    text = re.sub(r'^/all\s+', '', update.message.text, flags=re.I).strip()
+    if not text:
+        await update.message.reply_text("❌ Введи текст: /all <текст>")
+        return
+    count = 0
+    for chat_id in list(last_messages.keys()):
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=text)
+            count += 1
+            await asyncio.sleep(0.02)
+        except Exception:
+            continue
+    await update.message.reply_text(f"✅ Рассылка завершена, отправлено в ~{count} чатов.")
+    await send_log(context, f"/all: отправлено в {count} чатов.")
+
+# -----------------------
+# Включение / выключение бота
+# -----------------------
+async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global bot_active
+    if update.message is None or update.effective_user.id != OWNER_ID:
+        return
+    bot_active = True
+    await update.message.reply_text("🔔 Бот снова активен!")
+    await send_log(context, "Бот включён.")
+
+async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global bot_active
+    if update.message is None or update.effective_user.id != OWNER_ID:
+        return
+    bot_active = False
+    await update.message.reply_text("⚠️ Бот отключён — отвечает только на команды.")
+    await send_log(context, "Бот отключён.")
 
 # -----------------------
 # Логирование сообщений
 # -----------------------
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message:
-        last_messages[update.message.chat.id] = update.message.chat.id
-    if not bot_active:
-        return  # не отвечает, если выключен
+    if update.message is None:
+        return
+    last_messages[update.message.chat.id] = update.message.chat.id
 
 # -----------------------
-# Запуск
+# Запуск бота
 # -----------------------
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
+    # команды
     app.add_handler(CommandHandler("onbot", onbot))
     app.add_handler(CommandHandler("offbot", offbot))
-    app.add_handler(CommandHandler("trollsave", trollsave_cmd))
-    app.add_handler(CommandHandler("troll", troll_cmd))
-    app.add_handler(CommandHandler("trollstop", trollstop_cmd))
-    app.add_handler(CommandHandler("all", all_cmd))
     app.add_handler(CommandHandler("love", love_cmd))
     app.add_handler(CommandHandler("gift", gift_cmd))
+    app.add_handler(CommandHandler("all", all_cmd))
+
+    # логирование всех текстов
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_messages))
 
-    print("✅ Love+Troll Bot запущен!")
+    print("✅ Love Bot с вау-эффектом запущен!")
     app.run_polling()
