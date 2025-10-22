@@ -3,7 +3,7 @@ import threading
 import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 import random
 
 # 🔑 Токен
@@ -13,66 +13,71 @@ if not TELEGRAM_TOKEN:
 print("✅ TELEGRAM_TOKEN найден, бот запускается...")
 
 # ⚙️ Настройки
+TARGET_USERNAMES = ["Habib471"]
 SIGNATURE_USER = "Habib471"
 SIGNATURE_TEXT = "Полюби Апачи, как он тебя 💞"
 OWNER_USERNAME = "bxuwy"
 bot_active = True
+last_messages = {}
 
 # 🔒 Ограничение одновременных задач
 MAX_CONCURRENT_TASKS = 10
 task_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
-# 💖 Романтические фразы (для /love)
+# 📌 Хранение шаблона для троллинга
+saved_troll_template = None
+troll_stop = False
+
+# 💖 Романтические фразы
 LOVE_PHRASES = [
-    "Ты мне дорог",
-    "Я рад, что ты есть",
-    "Ты особенная",
-    "Ты мой человек",
-    "С тобой спокойно",
-    "Ты просто счастье",
-    "Ты делаешь день лучше",
-    "Каждый миг с тобой бесценен",
-    "Ты моя радость и вдохновение",
-    "С тобой хочется мечтать и жить",
-    "Ты — свет в моей жизни",
-    "Каждое утро начинается с мысли о тебе",
-    "Ты делаешь всё вокруг ярче",
-    "С тобой любое место становится домом",
-    "Ты — моя маленькая вселенная",
+    "Ты мне дорог", "Я рад, что ты есть", "Ты особенная", "Ты мой человек",
+    "С тобой спокойно", "Ты просто счастье", "Ты делаешь день лучше", "Ты важна",
+    "Ты мой уют", "Ты как свет", "Ты делаешь меня лучше", "С тобой всё по-другому",
+    "Ты моя радость", "Ты мой светлый человек", "Ты моё вдохновение", "Ты просто прекрасна",
+    "Ты мой свет в любой день", "Ты человек, которого не заменить", "Ты моё всё", "Ты дыхание моих чувств",
+    "Ты часть моего мира", "Ты нежность моего сердца", "Ты моё утро и мой покой", "Ты чудо, подаренное судьбой",
+    "Ты наполняешь жизнь смыслом", "Ты мой покой в шумном мире", "С тобой хочется жить",
+    "Ты делаешь меня счастливым", "Ты — моё настоящее", "Ты — лучшее, что со мной случалось",
+    "Ты как солнце после дождя", "Ты даришь тепло даже молчанием", "Ты — моя гармония", "Ты — мой дом",
+    "Ты всегда в моих мыслях", "Ты — причина моего вдохновения", "Ты приносишь свет туда, где темно",
+    "Ты — мой самый нежный человек", "Ты даёшь мне силы", "Ты — мой уют и покой", "С тобой всё имеет смысл",
+    "Ты наполняешь меня радостью", "Ты — мой смысл", "Ты — человек, которого хочется беречь",
+    "Ты — счастье, о котором я не просил, но получил", "Ты — мой тихий рай", "Ты — мой день и моя ночь",
+    "Ты — нежность, в которой хочется остаться", "Ты — самая добрая часть моего сердца",
+    "Ты делаешь жизнь ярче", "Ты — человек, с которым хочется всё", "Ты — мой вдохновитель",
+    "Ты — человек, ради которого стоит жить", "Ты — мой внутренний свет", "Ты — моё спокойствие в этом мире",
+    "Ты — мечта, ставшая реальностью", "Ты — самое тёплое чувство во мне",
+    "Ты — человек, которому можно доверить сердце", "Ты — мой нежный шторм",
+    "Ты — человек, рядом с которым всё становится возможным", "Ты — мой самый ценный человек",
+    "Ты — причина моего счастья", "Ты — человек, с которым время останавливается",
+    "Ты — мой нежный свет", "Ты — человек, которого я не хочу терять", "Ты — дыхание моей души",
+    "Ты — человек, который делает мир красивее", "Ты — моё вдохновение и покой одновременно",
+    "Ты — нежность, которой не хватает этому миру", "Ты — человек, без которого день неполный",
+    "Ты — моя самая добрая мысль"
 ]
 
 SPECIAL_PHRASES = [
     "С тобой даже тишина звучит красиво 💫",
     "Ты — причина улыбки Апачи 💖",
+    "Когда ты рядом, весь мир добрее 🌸",
     "Ты — вдохновение Апачи 💞",
-    "Твои глаза — как океан, в котором хочется тонуть",
-    "С тобой каждый момент становится магией",
-    "Ты — музыка моего сердца",
-    "Твои слова — как ласковый ветер в душе",
-    "Твоя улыбка способна растопить лёд в сердце",
-    "Ты — самая прекрасная мелодия в моей жизни",
-    "С тобой даже дождь кажется волшебным",
-]
-
-LOVE_LEVELS = [
-    (0, 10, "💔 Лёд между сердцами... но всё ещё есть шанс."),
-    (11, 25, "🌧️ Едва заметная искра, но она может вспыхнуть."),
-    (26, 45, "💫 Симпатия растёт, пусть время покажет."),
-    (46, 65, "💞 Нежное притяжение между вами."),
-    (66, 80, "💖 Сердца начинают биться в унисон."),
-    (81, 95, "💘 Это почти любовь — искренняя и сильная."),
-    (96, 100, "💍 Судьба связала вас — любовь навсегда."),
+    "Ты — свет, в котором он живёт ☀️",
+    "Ты — чувство, которое невозможно описать словами 💓",
+    "Апачи просто видит в тебе особенное 🌹",
+    "Ты — тот человек, ради которого хочется быть лучше 💫",
+    "Ты — искренность, которую он ценит 💖",
+    "Полюби Апачи, как он тебя 💞"
 ]
 
 GIFTS_ROMANTIC = [
     "💐 Букет слов и немного нежности",
     "🍫 Шоколад из чувства симпатии",
-    "🌹 Роза с ароматом тишины",
+    "🌹 Розу с ароматом тишины",
     "💌 Сердце, написанное от руки",
     "☕ Кофе с привкусом заботы",
     "🌙 Ночь под звёздами для двоих",
-    "💖 Улыбка, которая лечит душу",
-    "🎶 Мелодия из воспоминаний",
+    "💖 Улыбку, которая лечит душу",
+    "🎶 Мелодию из воспоминаний",
 ]
 
 GIFTS_FUNNY = [
@@ -105,10 +110,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Команды:\n"
         "/love — проверить совместимость 💘\n"
         "/gift — подарить подарок 🎁\n"
-        "/onbot — включить бота 🔔 (только владелец)\n"
-        "/offbot — отключить бота на обновление 🔕 (только владелец)"
+        "/trollsave — сохранить шаблон 📝\n"
+        "/troll — печать шаблона лесенкой 🪜 (только владелец)\n"
+        "/trollstop — остановка троллинга 🛑\n"
+        "/onbot и /offbot — включить/выключить бота (только создатель)."
     )
 
+# 🟢 /onbot
 async def bot_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_active
     if update.message.from_user.username != OWNER_USERNAME:
@@ -117,47 +125,50 @@ async def bot_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_active = True
     await update.message.reply_text("🔔 Бот включен!")
 
+# 🔴 /offbot
 async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_active
     if update.message.from_user.username != OWNER_USERNAME:
         await update.message.reply_text("🚫 У тебя нет прав использовать эту команду.")
         return
     bot_active = False
-    await update.message.reply_text("🔕 Бот отключен на обновление!")
+    await update.message.reply_text("🔕 Бот выключен на обновление!")
 
 # 💘 /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_active
+    message = update.message
     if not bot_active:
-        await update.message.reply_text("⏳ Бот сейчас отключен на обновление. Попробуй позже.")
+        await message.reply_text("⏳ Бот сейчас отключен на обновление.")
         return
-
     async def process_love():
         async with task_semaphore:
-            message = update.message
-            target = message.text.split(maxsplit=1)[1] if len(message.text.split()) > 1 else message.from_user.username
+            args = message.text.split(maxsplit=1)
+            target = args[1].replace("@", "") if len(args) > 1 else message.from_user.username
             final_score = random.randint(0, 100)
             phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES)
-            category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
             bar_length = 10
             filled_length = final_score * bar_length // 100
             bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
-            result_text = f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}]\n{phrase}\nКатегория: {category}"
+            sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n0% [----------]")
+            await asyncio.sleep(0.5)
+            await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}]")
+            result_text = f"💞 @{message.from_user.username} 💖 @{target}\nРезультат: {final_score}%\n{phrase}"
             if target.lower() == SIGNATURE_USER.lower():
                 result_text += f"\n\n{SIGNATURE_TEXT}"
-            await message.reply_text(result_text)
+            await asyncio.sleep(0.5)
+            await sent_msg.edit_text(result_text)
     asyncio.create_task(process_love())
 
 # 🎁 /gift
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_active
+    message = update.message
     if not bot_active:
-        await update.message.reply_text("⏳ Бот сейчас отключен на обновление. Попробуй позже.")
+        await message.reply_text("⏳ Бот сейчас отключен на обновление.")
         return
-
     async def process_gift():
         async with task_semaphore:
-            message = update.message
             args = message.text.split(maxsplit=1)
             if len(args) < 2:
                 await message.reply_text("🎁 Используй: /gift @username")
@@ -168,6 +179,50 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
     asyncio.create_task(process_gift())
 
+# 💾 /trollsave
+async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global saved_troll_template
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец.")
+        return
+    args = update.message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await update.message.reply_text("❌ Используй: /trollsave <текст с \\n>")
+        return
+    saved_troll_template = args[1].split("\\n")
+    await update.message.reply_text(f"✅ Шаблон сохранён с {len(saved_troll_template)} строками.")
+
+# 🪜 /troll
+async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global troll_stop, bot_active
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец.")
+        return
+    if not bot_active:
+        await update.message.reply_text("⏳ Бот на обновлении, троллинг невозможен.")
+        return
+    if not saved_troll_template:
+        await update.message.reply_text("❌ Нет сохранённого шаблона.")
+        return
+    async def send_ladder():
+        global troll_stop
+        troll_stop = False
+        for line in saved_troll_template:
+            if troll_stop:
+                break
+            await update.message.reply_text(line)
+            await asyncio.sleep(0.1)
+    asyncio.create_task(send_ladder())
+
+# 🛑 /trollstop
+async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global troll_stop
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец.")
+        return
+    troll_stop = True
+    await update.message.reply_text("🛑 Троллинг остановлен.")
+
 # 🚀 Запуск
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -176,6 +231,9 @@ def main():
     app.add_handler(CommandHandler("offbot", bot_off))
     app.add_handler(CommandHandler("love", love_command))
     app.add_handler(CommandHandler("gift", gift_command))
+    app.add_handler(CommandHandler("trollsave", trollsave_command))
+    app.add_handler(CommandHandler("troll", troll_command))
+    app.add_handler(CommandHandler("trollstop", trollstop_command))
     print("🚀 Бот запущен!")
     app.run_polling()
 
