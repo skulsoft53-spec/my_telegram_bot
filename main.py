@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 import random
 import traceback
-import nest_asyncio
+import re
 
 # 🔑 Токен
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -160,17 +160,37 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         await send_log(context, f"Ошибка в /gift: {traceback.format_exc()}")
 
-# 💾 /trollsave
+# 💾 /trollsave — умное деление текста на строки
 async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global saved_troll_template
     if update.message.from_user.username != OWNER_USERNAME:
         await update.message.reply_text("🚫 Только владелец.")
         return
+    
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
-        await update.message.reply_text("❌ Используй: /trollsave <текст с \\n>")
+        await update.message.reply_text("❌ Используй: /trollsave <текст>")
         return
-    saved_troll_template = args[1].split("\\n")
+    
+    text = args[1].strip()
+    
+    # Разбиваем по предложениям
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    
+    # Делим длинные предложения
+    max_len = 40
+    lines = []
+    for sentence in sentences:
+        while len(sentence) > max_len:
+            split_pos = sentence.rfind(' ', 0, max_len)
+            if split_pos == -1:
+                split_pos = max_len
+            lines.append(sentence[:split_pos].strip())
+            sentence = sentence[split_pos:].strip()
+        if sentence:
+            lines.append(sentence)
+    
+    saved_troll_template = lines
     await update.message.reply_text(f"✅ Шаблон сохранён с {len(saved_troll_template)} строками.")
 
 # 🪜 /troll — быстрый троллинг
@@ -190,13 +210,12 @@ async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for line in saved_troll_template:
                 if troll_stop:
                     break
-                if update.message.from_user.username != OWNER_USERNAME:
-                    await update.message.reply_text(line)
-                await asyncio.sleep(0.05)
+                await update.message.reply_text(line)
+                await asyncio.sleep(0.1)  # скорость "лесенки"
 
     asyncio.create_task(send_ladder())
 
-# 🛑 /trollstop
+# 🛑 /trollstop — остановка троллинга
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
     if update.message.from_user.username != OWNER_USERNAME:
@@ -229,7 +248,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🚀 Запуск
 if __name__ == "__main__":
-    nest_asyncio.apply()
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("onbot", bot_on_command))
