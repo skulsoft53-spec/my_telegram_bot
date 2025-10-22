@@ -18,7 +18,7 @@ TARGET_USERNAMES = ["Habib471"]
 SIGNATURE_USER = "Habib471"
 SIGNATURE_TEXT = "Полюби Апачи, как он тебя 💞"
 OWNER_USERNAME = "bxuwy"
-LOG_CHANNEL_ID = -1003107269526
+LOG_CHANNEL_ID = -1003107269526  # Канал для логов
 bot_active = True
 updating = False
 last_messages = {}
@@ -119,7 +119,7 @@ async def bot_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔔 Бот снова активен!")
     await send_log(context, "Бот включен.")
 
-# 💘 /love с мгновенной шкалой
+# 💘 /love — мгновенная красивая шкала
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if not bot_active:
@@ -134,13 +134,27 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             target = args[1].replace("@", "") if len(args) > 1 else message.from_user.username
             final_score = random.randint(0, 100)
 
-            # Мгновенная шкала — сразу заполнена
+            hearts = ["❤️", "💖", "💘", "💞"]
+            sparkles = ["✨", "💫", "🌸", "⭐"]
+
             bar_length = 20
             filled_length = final_score * bar_length // 100
-            bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
 
+            # Мгновенное заполнение шкалы с рандомными сердцами
+            bar = "".join(random.choices(hearts + sparkles, k=filled_length)) + "🖤" * (bar_length - filled_length)
+
+            sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{bar}]")
+
+            # Лёгкая анимация мерцающих сердец (3 раза)
+            for _ in range(3):
+                anim_bar = "".join(random.choices(hearts + sparkles, k=filled_length)) + "🖤" * (bar_length - filled_length)
+                await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{final_score}% [{anim_bar}]")
+                await asyncio.sleep(0.2)
+
+            # Итоговое сообщение
             phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
             category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
+
             result_text = (
                 f"💞 @{message.from_user.username} 💖 @{target}\n"
                 f"🎯 Результат: {final_score}% [{bar}]\n"
@@ -149,8 +163,9 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if target.lower() == SIGNATURE_USER.lower():
                 result_text += f"\n\n{SIGNATURE_TEXT}"
 
-            await message.reply_text(result_text)
+            await sent_msg.edit_text(result_text)
             await send_log(context, f"/love: @{message.from_user.username} 💖 @{target} = {final_score}%")
+
     except Exception:
         await send_log(context, f"Ошибка в /love от @{update.message.from_user.username}:\n{traceback.format_exc()}")
 
@@ -172,7 +187,13 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             target = args[1].replace("@", "")
             gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
             gift = random.choice(gift_list)
-            await message.reply_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
+
+            sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 …")
+            # Анимация "дарения"
+            for _ in range(3):
+                await asyncio.sleep(0.2)
+                await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 🎉")
+            await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
             await send_log(context, f"/gift: @{message.from_user.username} → @{target} ({gift})")
     except Exception:
         await send_log(context, f"Ошибка в /gift от @{update.message.from_user.username}:\n{traceback.format_exc()}")
@@ -190,7 +211,7 @@ async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     saved_troll_template = args[1].split("\\n")
     await update.message.reply_text(f"✅ Шаблон сохранён с {len(saved_troll_template)} строками.")
 
-# 🪜 /troll — теперь флудит построчно
+# 🪜 /troll — экстремально быстрая версия
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
     if update.message.from_user.username != OWNER_USERNAME:
@@ -200,19 +221,20 @@ async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет сохранённого шаблона.")
         return
 
-    async def send_ladder():
+    async def send_ladder_extreme():
         global troll_stop
-        async with task_semaphore:
-            troll_stop = False
-            for block in saved_troll_template:
-                lines = block.split("\n")  # разбиваем на строки
-                for line in lines:
-                    if troll_stop:
-                        break
-                    await update.message.reply_text(line)
-                    await asyncio.sleep(0.1)
+        troll_stop = False
+        tasks = []
 
-    asyncio.create_task(send_ladder())
+        for line in saved_troll_template:
+            if troll_stop:
+                break
+            tasks.append(asyncio.create_task(update.message.reply_text(line)))
+            await asyncio.sleep(0.01)
+
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    asyncio.create_task(send_ladder_extreme())
 
 # 🛑 /trollstop
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
