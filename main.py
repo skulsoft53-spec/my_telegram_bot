@@ -17,7 +17,7 @@ print("✅ TELEGRAM_TOKEN найден, бот запускается...")
 SIGNATURE_USER = "Habib471"
 SIGNATURE_TEXT = "Полюби Апачи, как он тебя 💞"
 OWNER_USERNAME = "bxuwy"
-OWNER_ID = 8486672898  # Твой ID
+OWNER_ID = 8486672898
 LOG_CHANNEL_ID = -1003107269526
 bot_active = True
 updating = False
@@ -176,25 +176,23 @@ async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         saved_troll_template = [text[i:i+max_len] for i in range(0, len(text), max_len)]
     await update.message.delete()
 
-# 🪜 troll
+# 🪜 troll — быстрый троллинг в группах
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
     if update.message is None or update.message.from_user.id != OWNER_ID:
         return
     if not saved_troll_template:
+        await update.message.reply_text("❌ Нет сохраненного шаблона для троллинга.")
         return
     await update.message.delete()
     troll_stop = False
 
-    async def send_ladder():
-        global troll_stop
-        for line in saved_troll_template:
-            if troll_stop:
-                break
-            await context.bot.send_message(chat_id=update.message.chat.id, text=line)
-            await asyncio.sleep(0.05)
-
-    asyncio.create_task(send_ladder())
+    msg = await context.bot.send_message(chat_id=update.message.chat.id, text="")
+    for line in saved_troll_template:
+        if troll_stop:
+            break
+        await msg.edit_text(line)
+        await asyncio.sleep(0.01)
 
 # 🛑 trollstop
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -224,7 +222,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None:
         return
     last_messages[update.message.chat.id] = update.message.chat.id
-    # Если бот выключен, не отвечает на обычные сообщения, только на команды
     if not bot_active and not update.message.text.startswith("/"):
         return
 
