@@ -97,7 +97,7 @@ async def bot_off_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     bot_active = False
     updating = True
-    await update.message.reply_text("⚠️ Бот отключен на обновление. Теперь он будет отвечать на все сообщения.")
+    await update.message.reply_text("⚠️ Бот отключен — он теперь отвечает только на команды.")
     await send_log(context, "Бот отключен на обновление.")
 
 async def bot_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -159,7 +159,7 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
         await send_log(context, f"gift: @{message.from_user.username} → @{target} ({gift})")
 
-# 💾 trollsave с авторазбивкой на строки
+# 💾 trollsave
 async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global saved_troll_template
     if update.message is None or update.message.from_user.username != OWNER_USERNAME:
@@ -218,14 +218,14 @@ async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 continue
 
-# 💬 Логирование и автоответ на текстовые сообщения
+# 💬 Логирование сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None:
         return
     last_messages[update.message.chat.id] = update.message.chat.id
-    # Если бот отключен, отвечает на все текстовые сообщения кроме команд
+    # Если бот выключен, не отвечаем на обычные сообщения, только на команды
     if not bot_active and not update.message.text.startswith("/"):
-        await update.message.reply_text("⚠️ Бот временно отключен. Он всё равно отвечает на сообщения!")
+        return
 
 # 🚀 Запуск
 if __name__ == "__main__":
