@@ -5,7 +5,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 import random
-import traceback
 import re
 
 # 🔑 Токен
@@ -98,7 +97,7 @@ async def bot_off_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     bot_active = False
     updating = True
-    await update.message.reply_text("⚠️ Бот отключен на обновление.")
+    await update.message.reply_text("⚠️ Бот отключен на обновление. Теперь он будет отвечать на все сообщения.")
     await send_log(context, "Бот отключен на обновление.")
 
 async def bot_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -162,13 +161,13 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 💾 trollsave с авторазбивкой на строки
 async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global saved_troll_template
     if update.message is None or update.message.from_user.username != OWNER_USERNAME:
         return
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
         return
     text = args[1].strip()
-    # Авторазделение на строки по \n или по 40 символов
     if "\n" in text:
         saved_troll_template = text.split("\n")
     else:
@@ -184,22 +183,25 @@ async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not saved_troll_template:
         return
     await update.message.delete()
+    troll_stop = False
+
     async def send_ladder():
         global troll_stop
-        troll_stop = False
         for line in saved_troll_template:
             if troll_stop:
                 break
             await context.bot.send_message(chat_id=update.message.chat.id, text=line)
             await asyncio.sleep(0.05)
+
     asyncio.create_task(send_ladder())
 
 # 🛑 trollstop
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global troll_stop
     if update.message is None or update.message.from_user.username != OWNER_USERNAME:
         return
-    global troll_stop
     troll_stop = True
+    await update.message.reply_text("🛑 Троллинг остановлен!")
 
 # /all
 async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -216,13 +218,14 @@ async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 continue
 
-# 💬 Логирование сообщений
+# 💬 Логирование и автоответ на текстовые сообщения
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None:
         return
     last_messages[update.message.chat.id] = update.message.chat.id
-    if not bot_active:
-        await update.message.reply_text("⚠️ Бот временно отключен.")
+    # Если бот отключен, отвечает на все текстовые сообщения кроме команд
+    if not bot_active and not update.message.text.startswith("/"):
+        await update.message.reply_text("⚠️ Бот временно отключен. Он всё равно отвечает на сообщения!")
 
 # 🚀 Запуск
 if __name__ == "__main__":
