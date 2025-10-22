@@ -157,18 +157,23 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 🎉")
             await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
             await send_log(context, f"gift: @{message.from_user.username} → @{target} ({gift})")
+    except Exception:
+        await send_log(context, f"Ошибка в gift: {traceback.format_exc()}")
 
 # 💾 trollsave без ограничения длины
 async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global saved_troll_template
-    if update.message.from_user.username != OWNER_USERNAME:
-        return
-    args = update.message.text.split(maxsplit=1)
-    if len(args) < 2:
-        return
-    text = args[1].strip()
-    saved_troll_template = text.split("\n") if "\n" in text else [text]
-    await update.message.delete()
+    try:
+        global saved_troll_template
+        if update.message.from_user.username != OWNER_USERNAME:
+            return
+        args = update.message.text.split(maxsplit=1)
+        if len(args) < 2:
+            return
+        text = args[1].strip()
+        saved_troll_template = text.split("\n") if "\n" in text else [text]
+        await update.message.delete()
+    except Exception as e:
+        await send_log(context, f"Ошибка в trollsave_command: {e}")
 
 # 🪜 troll
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -219,7 +224,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 🚀 Запуск
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
     app.add_handler(MessageHandler(filters.Regex(r'^[/\.]?start$'), start))
     app.add_handler(MessageHandler(filters.Regex(r'^[/\.]?onbot$'), bot_on_command))
     app.add_handler(MessageHandler(filters.Regex(r'^[/\.]?offbot$'), bot_off_command))
@@ -230,6 +234,5 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?trollstop|trollstop)'), trollstop_command))
     app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?all|all)'), all_command))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-
     print("✅ Бот запущен!")
     app.run_polling()
