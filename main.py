@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 import random
+import traceback
 
 # 🔑 Токен
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -17,7 +18,7 @@ TARGET_USERNAMES = ["Habib471"]
 SIGNATURE_USER = "Habib471"
 SIGNATURE_TEXT = "Полюби Апачи, как он тебя 💞"
 OWNER_USERNAME = "bxuwy"
-LOG_CHANNEL_ID = -1003107269526  # канал для логов
+LOG_CHANNEL_ID = -1003107269526  # Канал для логов
 bot_active = True
 updating = False
 last_messages = {}
@@ -77,65 +78,46 @@ def run_web():
 
 threading.Thread(target=run_web, daemon=True).start()
 
-# 📤 Функция логов
+# 📤 Логи
 async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
     try:
         await context.bot.send_message(chat_id=LOG_CHANNEL_ID, text=text)
-    except:
-        pass
-
-# 📤 Универсальное логирование ошибок
-async def log_exception(context: ContextTypes.DEFAULT_TYPE, update: Update, e: Exception, command_name: str = ""):
-    import traceback
-    user = update.message.from_user.username if update.message and update.message.from_user else "Неизвестный"
-    text = (
-        f"⚠️ Ошибка в команде {command_name} от @{user}:\n"
-        f"{traceback.format_exc()}"
-    )
-    await send_log(context, text)
+    except Exception as e:
+        print(f"Ошибка при отправке лога: {e}")
 
 # 💬 Команды
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        await update.message.reply_text(
-            "💞 Привет! Я LoveBot by Apachi.\n"
-            "Команды:\n"
-            "/love — проверить совместимость 💘\n"
-            "/gift — подарить подарок 🎁\n"
-            "/trollsave — сохранить шаблон 📝\n"
-            "/troll — печать шаблона лесенкой 🪜 (только владелец)\n"
-            "/trollstop — остановка троллинга 🛑\n"
-            "/onbot и /offbot — включить/выключить бота (только создатель)."
-        )
-    except Exception as e:
-        await log_exception(context, update, e, "/start")
+    await update.message.reply_text(
+        "💞 Привет! Я LoveBot by Apachi.\n"
+        "Команды:\n"
+        "/love — проверить совместимость 💘\n"
+        "/gift — подарить подарок 🎁\n"
+        "/trollsave — сохранить шаблон 📝\n"
+        "/troll — печать шаблона лесенкой 🪜 (только владелец)\n"
+        "/trollstop — остановка троллинга 🛑\n"
+        "/onbot и /offbot — включить/выключить бота (только создатель)."
+    )
 
 # 🔘 /onbot и /offbot
 async def bot_off_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_active, updating
-    try:
-        if update.message.from_user.username != OWNER_USERNAME:
-            await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
-            return
-        bot_active = False
-        updating = True
-        await update.message.reply_text("⚠️ Бот отключен на обновление.")
-        await send_log(context, "Бот отключен на обновление.")
-    except Exception as e:
-        await log_exception(context, update, e, "/offbot")
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        return
+    bot_active = False
+    updating = True
+    await update.message.reply_text("⚠️ Бот отключен на обновление.")
+    await send_log(context, "Бот отключен на обновление.")
 
 async def bot_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_active, updating
-    try:
-        if update.message.from_user.username != OWNER_USERNAME:
-            await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
-            return
-        bot_active = True
-        updating = False
-        await update.message.reply_text("🔔 Бот снова активен!")
-        await send_log(context, "Бот включен.")
-    except Exception as e:
-        await log_exception(context, update, e, "/onbot")
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        return
+    bot_active = True
+    updating = False
+    await update.message.reply_text("🔔 Бот снова активен!")
+    await send_log(context, "Бот включен.")
 
 # 💘 /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -150,37 +132,32 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message = update.message
             args = message.text.split(maxsplit=1)
             target = args[1].replace("@", "") if len(args) > 1 else message.from_user.username
-
             final_score = random.randint(0, 100)
-            hearts = ["❤️", "💖", "💓", "💘"]
-            sparkles = ["✨", "💫", "🌸", "⭐"]
-            phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
-            category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
 
             sent_msg = await message.reply_text(f"💞 @{message.from_user.username} 💖 @{target}\n0% [----------]")
 
-            # Прогресс-бар
-            bar_length = 10
+            # Многоуровневая шкала с анимацией
+            bar_length = 20
             for i in range(1, final_score + 1):
                 filled_length = i * bar_length // 100
                 bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
-                flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
-                await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{i}% [{bar}] {flying_hearts}")
+                await sent_msg.edit_text(f"💞 @{message.from_user.username} 💖 @{target}\n{i}% [{bar}]")
                 await asyncio.sleep(0.05)
 
-            emojis = "".join(random.choices(hearts + sparkles, k=6))
+            phrase = random.choice(SPECIAL_PHRASES if target.lower() == SIGNATURE_USER.lower() else LOVE_PHRASES + LOVE_JOKES)
+            category = next((label for (low, high, label) in LOVE_LEVELS if low <= final_score <= high), "💞 Нежные чувства")
             result_text = (
                 f"💞 @{message.from_user.username} 💖 @{target}\n"
                 f"🎯 Результат: {final_score}%\n"
-                f"{phrase}\n\nКатегория: {category} {emojis}"
+                f"{phrase}\n\nКатегория: {category}"
             )
             if target.lower() == SIGNATURE_USER.lower():
                 result_text += f"\n\n{SIGNATURE_TEXT}"
 
             await sent_msg.edit_text(result_text)
             await send_log(context, f"/love: @{message.from_user.username} 💖 @{target} = {final_score}%")
-    except Exception as e:
-        await log_exception(context, update, e, "/love")
+    except Exception:
+        await send_log(context, f"Ошибка в /love от @{update.message.from_user.username}:\n{traceback.format_exc()}")
 
 # 🎁 /gift
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -200,73 +177,72 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             target = args[1].replace("@", "")
             gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
             gift = random.choice(gift_list)
-            await message.reply_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
+
+            sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 …")
+            # Анимация "дарения"
+            for _ in range(3):
+                await asyncio.sleep(0.2)
+                await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 🎉")
+            await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
             await send_log(context, f"/gift: @{message.from_user.username} → @{target} ({gift})")
-    except Exception as e:
-        await log_exception(context, update, e, "/gift")
+    except Exception:
+        await send_log(context, f"Ошибка в /gift от @{update.message.from_user.username}:\n{traceback.format_exc()}")
 
 # 💾 /trollsave
 async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        global saved_troll_template
-        if update.message.from_user.username != OWNER_USERNAME:
-            await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
-            return
-        args = update.message.text.split(maxsplit=1)
-        if len(args) < 2:
-            await update.message.reply_text("❌ Используй: /trollsave <текст с \\n>")
-            return
-        saved_troll_template = args[1].split("\\n")
-        await update.message.reply_text(f"✅ Шаблон сохранён с {len(saved_troll_template)} строками.")
-    except Exception as e:
-        await log_exception(context, update, e, "/trollsave")
+    global saved_troll_template
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        return
+    args = update.message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await update.message.reply_text("❌ Используй: /trollsave <текст с \\n>")
+        return
+    saved_troll_template = args[1].split("\\n")
+    await update.message.reply_text(f"✅ Шаблон сохранён с {len(saved_troll_template)} строками.")
 
 # 🪜 /troll
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
+    global troll_stop
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        return
+    if not saved_troll_template:
+        await update.message.reply_text("❌ Нет сохранённого шаблона.")
+        return
+
+    async def send_ladder():
         global troll_stop
-        if update.message.from_user.username != OWNER_USERNAME:
-            await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
-            return
-        if not saved_troll_template:
-            await update.message.reply_text("❌ Нет сохранённого шаблона.")
-            return
+        async with task_semaphore:
+            troll_stop = False
+            for line in saved_troll_template:
+                if troll_stop:
+                    break
+                await update.message.reply_text(line)
+                await asyncio.sleep(0.1)
 
-        async def send_ladder():
-            global troll_stop
-            async with task_semaphore:
-                troll_stop = False
-                for line in saved_troll_template:
-                    if troll_stop:
-                        break
-                    await update.message.reply_text(line)
-                    await asyncio.sleep(0.1)
-
-        asyncio.create_task(send_ladder())
-    except Exception as e:
-        await log_exception(context, update, e, "/troll")
+    asyncio.create_task(send_ladder())
 
 # 🛑 /trollstop
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        global troll_stop
-        if update.message.from_user.username != OWNER_USERNAME:
-            await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
-            return
-        troll_stop = True
-        await update.message.reply_text("🛑 Троллинг остановлен.")
-    except Exception as e:
-        await log_exception(context, update, e, "/trollstop")
+    global troll_stop
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        return
+    troll_stop = True
+    await update.message.reply_text("🛑 Троллинг остановлен.")
 
-# 💬 Логирование всех сообщений от пользователей
+# 💬 Логируем любые сообщения и ошибки
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.message.from_user.username != OWNER_USERNAME:
-            await send_log(context, f"Сообщение от @{update.message.from_user.username}: {update.message.text}")
+        user = update.message.from_user.username
+        text = update.message.text
+        if user != OWNER_USERNAME:
+            await send_log(context, f"Сообщение от @{user}: {text}")
         if not bot_active and updating:
             await update.message.reply_text("⚠️ Бот временно отключен на обновление.")
-    except:
-        pass
+    except Exception:
+        await send_log(context, f"Ошибка при обработке сообщения от @{update.message.from_user.username}:\n{traceback.format_exc()}")
 
 # 🚀 Запуск
 def main():
