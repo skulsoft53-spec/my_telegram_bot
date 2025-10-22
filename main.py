@@ -24,6 +24,10 @@ last_messages = {}
 MAX_CONCURRENT_TASKS = 10
 task_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
+# 📌 Хранение шаблона для троллинга
+saved_troll_template = None
+troll_stop = False
+
 # 💖 Простые романтические фразы
 LOVE_PHRASES = [
     "Ты мне дорог", "Я рад, что ты есть", "Ты особенная", "Ты мой человек",
@@ -124,6 +128,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Команды:\n"
         "/love — проверить совместимость 💘\n"
         "/gift — подарить подарок 🎁\n"
+        "/trollsave — сохранить шаблон 📝\n"
+        "/troll — печать шаблона лесенкой 🪜\n"
+        "/trollstop — остановка троллинга 🛑\n"
         "/on и /off — включить/выключить бота (только создатель)."
     )
 
@@ -143,11 +150,10 @@ async def bot_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_active = False
     await update.message.reply_text("🔕 Бот выключен!")
 
-# 💘 /love с параллельной обработкой
+# 💘 /love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
-
     async def process_love():
         async with task_semaphore:
             message = update.message
@@ -162,7 +168,6 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             hearts = ["❤️", "💖", "💓", "💘"]
             sparkles = ["✨", "💫", "🌸", "⭐"]
 
-            # Быстро заполняем шкалу
             filled_length = final_score * bar_length // 100
             bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
             flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(1, 3)))
@@ -178,14 +183,12 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 result_text += f"\n\n{SIGNATURE_TEXT}"
 
             await sent_msg.edit_text(result_text)
-
     asyncio.create_task(process_love())
 
-# 🎁 /gift с параллельной обработкой
+# 🎁 /gift
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not bot_active:
         return
-
     async def process_gift():
         async with task_semaphore:
             message = update.message
@@ -196,20 +199,15 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             target = args[1].replace("@", "")
             gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
             gift = random.choice(gift_list)
-
             sent_msg = await message.reply_text(f"🎁 @{message.from_user.username} готовит подарок для @{target}...\n\n0% [----------]")
-
             bar_length = 10
             hearts = ["❤️", "💖", "💓", "💘"]
             sparkles = ["✨", "💫", "🌸", "⭐"]
-
             filled_length = bar_length
             bar = "❤️" * filled_length + "🖤" * (bar_length - filled_length)
             flying_hearts = "".join(random.choices(hearts + sparkles, k=random.randint(2, 4)))
             await sent_msg.edit_text(f"🎁 @{message.from_user.username} 💖 @{target}\n100% [{bar}] {flying_hearts}")
-
             await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}\n\n✨ Пусть этот момент запомнится надолго!")
-
     asyncio.create_task(process_gift())
 
 # 💬 Реакция на сообщения выбранных пользователей
@@ -223,7 +221,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not username:
         return
     if message.chat.type in ["group", "supergroup"] and username in TARGET_USERNAMES:
-
         async def process_message():
             async with task_semaphore:
                 phrase = random.choice(SPECIAL_PHRASES)
@@ -232,8 +229,72 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 last_messages[username] = phrase
                 text_to_send = f"{phrase}\n\n{SIGNATURE_TEXT}"
                 await message.reply_text(text_to_send, reply_to_message_id=message.message_id)
-
         asyncio.create_task(process_message())
+
+# 💾 /trollsave
+async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global saved_troll_template
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        return
+    args = update.message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await update.message.reply_text("❌ Используй: /trollsave <текст>")
+        return
+    saved_troll_template = args[1]
+    await update.message.reply_text(f"✅ Шаблон сохранён: {saved_troll_template}")
+
+# 🪜 /troll — быстрый лесенкой (только владелец)
+async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global troll_stop
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        return
+    if not saved_troll_template:
+        await update.message.reply_text("❌ Нет сохранённого шаблона. Используй /trollsave <текст>")
+        return
+
+    async def send_ladder_fast():
+        global troll_stop
+        async with task_semaphore:
+            troll_stop = False
+            message = update.message
+            words = saved_troll_template.split()
+            current_line = []
+
+            for word in words:
+                if troll_stop:
+                    await message.reply_text("🛑 Троллинг остановлен.")
+                    break
+
+                current_line.append(word)
+                line_text = " ".join(current_line)
+
+                typed_text = ""
+                for char in line_text:
+                    if troll_stop:
+                        await message.reply_text("🛑 Троллинг остановлен.")
+                        return
+                    typed_text += char
+                    await asyncio.sleep(0.005)
+                    try:
+                        await message.edit_text(typed_text)
+                    except:
+                        await message.reply_text(typed_text)
+
+                await asyncio.sleep(0.01)
+
+    sent_msg = await update.message.reply_text("...")
+    asyncio.create_task(send_ladder_fast())
+
+# 🛑 /trollstop — остановка троллинга (только владелец)
+async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global troll_stop
+    if update.message.from_user.username != OWNER_USERNAME:
+        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        return
+    troll_stop = True
+    await update.message.reply_text("🛑 Команда остановки активирована.")
 
 # 🚀 Запуск
 def main():
@@ -243,6 +304,9 @@ def main():
     app.add_handler(CommandHandler("gift", gift_command))
     app.add_handler(CommandHandler("on", bot_on))
     app.add_handler(CommandHandler("off", bot_off))
+    app.add_handler(CommandHandler("trollsave", trollsave_command))
+    app.add_handler(CommandHandler("troll", troll_command))
+    app.add_handler(CommandHandler("trollstop", trollstop_command))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     print("🚀 Бот запущен!")
     app.run_polling()
