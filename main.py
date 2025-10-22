@@ -3,7 +3,7 @@ import threading
 import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 import random
 import traceback
 import re
@@ -15,11 +15,10 @@ if not TELEGRAM_TOKEN:
 print("✅ TELEGRAM_TOKEN найден, бот запускается...")
 
 # ⚙️ Настройки
-TARGET_USERNAMES = ["Habib471"]
 SIGNATURE_USER = "Habib471"
 SIGNATURE_TEXT = "Полюби Апачи, как он тебя 💞"
 OWNER_USERNAME = "bxuwy"
-LOG_CHANNEL_ID = -1003107269526  # Канал для логов
+LOG_CHANNEL_ID = -1003107269526
 bot_active = True
 updating = False
 last_messages = {}
@@ -30,7 +29,7 @@ task_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 saved_troll_template = None
 troll_stop = False
 
-# 💖 Фразы /love
+# 💖 Фразы love
 LOVE_PHRASES = [
     "Ты мне дорог", "Я рад, что ты есть", "Ты особенная", "Ты мой человек",
     "С тобой спокойно", "Ты просто счастье", "Ты делаешь день лучше", "Ты важна",
@@ -64,6 +63,7 @@ def run_web():
             self.wfile.write(b"LoveBot is running <3")
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
+
 threading.Thread(target=run_web, daemon=True).start()
 
 # 📤 Логи
@@ -78,19 +78,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💞 Привет! Я LoveBot by Apachi.\n"
         "Команды:\n"
-        "/love — проверить совместимость 💘\n"
-        "/gift — подарить подарок 🎁\n"
-        "/trollsave — сохранить шаблон 📝\n"
-        "/troll — печать шаблона лесенкой 🪜 (только владелец)\n"
-        "/trollstop — остановка троллинга 🛑\n"
-        "/onbot и /offbot — включить/выключить бота (только создатель).\n"
-        ".all <текст> — отправка всем (только владелец)"
+        ".love /love love — проверить совместимость 💘\n"
+        ".gift /gift gift — подарить подарок 🎁\n"
+        ".trollsave /trollsave trollsave — сохранить шаблон 📝\n"
+        ".troll /troll troll — печать шаблона лесенкой 🪜 (только владелец)\n"
+        ".trollstop /trollstop trollstop — остановка троллинга 🛑\n"
+        ".onbot/.offbot /onbot /offbot — включить/выключить бота (только создатель)\n"
+        ".all /all all <текст> — отправка всем (только владелец)"
     )
 
 async def bot_off_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_active, updating
     if update.message.from_user.username != OWNER_USERNAME:
-        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        await update.message.reply_text("🚫 Только владелец.")
         return
     bot_active = False
     updating = True
@@ -100,14 +100,14 @@ async def bot_off_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def bot_on_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_active, updating
     if update.message.from_user.username != OWNER_USERNAME:
-        await update.message.reply_text("🚫 Только владелец может использовать эту команду.")
+        await update.message.reply_text("🚫 Только владелец.")
         return
     bot_active = True
     updating = False
     await update.message.reply_text("🔔 Бот снова активен!")
     await send_log(context, "Бот включен.")
 
-# 💘 /love — мгновенная шкала
+# 💘 love
 async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if not bot_active:
@@ -133,11 +133,11 @@ async def love_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if target.lower() == SIGNATURE_USER.lower():
                 result_text += f"\n\n{SIGNATURE_TEXT}"
             await sent_msg.edit_text(result_text)
-            await send_log(context, f"/love: @{message.from_user.username} 💖 @{target} = {final_score}%")
+            await send_log(context, f"love: @{message.from_user.username} 💖 @{target} = {final_score}%")
     except Exception:
-        await send_log(context, f"Ошибка в /love: {traceback.format_exc()}")
+        await send_log(context, f"Ошибка в love: {traceback.format_exc()}")
 
-# 🎁 /gift
+# 🎁 gift
 async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if not bot_active:
@@ -146,7 +146,7 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message = update.message
             args = message.text.split(maxsplit=1)
             if len(args) < 2:
-                await message.reply_text("🎁 Используй: /gift @username")
+                await message.reply_text("🎁 Используй: gift @username")
                 return
             target = args[1].replace("@", "")
             gift_list = GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY
@@ -156,79 +156,50 @@ async def gift_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await asyncio.sleep(0.2)
                 await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n🎁 🎉")
             await sent_msg.edit_text(f"🎁 @{message.from_user.username} дарит @{target} подарок:\n{gift}")
-            await send_log(context, f"/gift: @{message.from_user.username} → @{target} ({gift})")
-    except Exception:
-        await send_log(context, f"Ошибка в /gift: {traceback.format_exc()}")
+            await send_log(context, f"gift: @{message.from_user.username} → @{target} ({gift})")
 
-# 💾 /trollsave — умное деление текста на строки
+# 💾 trollsave без ограничения длины
 async def trollsave_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global saved_troll_template
     if update.message.from_user.username != OWNER_USERNAME:
-        await update.message.reply_text("🚫 Только владелец.")
         return
-    
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
-        await update.message.reply_text("❌ Используй: /trollsave <текст>")
         return
-    
     text = args[1].strip()
-    
-    # Разбиваем по предложениям
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    
-    # Делим длинные предложения
-    max_len = 40
-    lines = []
-    for sentence in sentences:
-        while len(sentence) > max_len:
-            split_pos = sentence.rfind(' ', 0, max_len)
-            if split_pos == -1:
-                split_pos = max_len
-            lines.append(sentence[:split_pos].strip())
-            sentence = sentence[split_pos:].strip()
-        if sentence:
-            lines.append(sentence)
-    
-    saved_troll_template = lines
-    await update.message.reply_text(f"✅ Шаблон сохранён с {len(saved_troll_template)} строками.")
+    saved_troll_template = text.split("\n") if "\n" in text else [text]
+    await update.message.delete()
 
-# 🪜 /troll — быстрый троллинг
+# 🪜 troll
 async def troll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
     if update.message.from_user.username != OWNER_USERNAME:
-        await update.message.reply_text("🚫 Только владелец.")
         return
     if not saved_troll_template:
-        await update.message.reply_text("❌ Нет шаблона.")
         return
-
+    await update.message.delete()
     async def send_ladder():
         global troll_stop
-        async with task_semaphore:
-            troll_stop = False
-            for line in saved_troll_template:
-                if troll_stop:
-                    break
-                await update.message.reply_text(line)
-                await asyncio.sleep(0.1)  # скорость "лесенки"
-
+        troll_stop = False
+        for line in saved_troll_template:
+            if troll_stop:
+                break
+            await context.bot.send_message(chat_id=update.message.chat.id, text=line)
+            await asyncio.sleep(0.05)
     asyncio.create_task(send_ladder())
 
-# 🛑 /trollstop — остановка троллинга
+# 🛑 trollstop
 async def trollstop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global troll_stop
     if update.message.from_user.username != OWNER_USERNAME:
-        await update.message.reply_text("🚫 Только владелец.")
         return
     troll_stop = True
-    await update.message.reply_text("🛑 Троллинг остановлен.")
 
-# .all — рассылка всем (только владелец)
+# .all
 async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.username != OWNER_USERNAME:
         return
-    text = update.message.text[5:]  # после ".all "
+    text = re.sub(r'^[/.]?all\s+', '', update.message.text, flags=re.I)
     async with task_semaphore:
         for chat_id in last_messages:
             try:
@@ -239,8 +210,7 @@ async def all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 💬 Логирование сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        chat_id = update.message.chat.id
-        last_messages[chat_id] = update.message.from_user.username
+        last_messages[update.message.chat.id] = update.message.chat.id
         if not bot_active:
             await update.message.reply_text("⚠️ Бот временно отключен.")
     except Exception:
@@ -249,15 +219,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 🚀 Запуск
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("onbot", bot_on_command))
-    app.add_handler(CommandHandler("offbot", bot_off_command))
-    app.add_handler(CommandHandler("love", love_command))
-    app.add_handler(CommandHandler("gift", gift_command))
-    app.add_handler(CommandHandler("trollsave", trollsave_command))
-    app.add_handler(CommandHandler("troll", troll_command))
-    app.add_handler(CommandHandler("trollstop", trollstop_command))
+
+    app.add_handler(MessageHandler(filters.Regex(r'^[/\.]?start$'), start))
+    app.add_handler(MessageHandler(filters.Regex(r'^[/\.]?onbot$'), bot_on_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^[/\.]?offbot$'), bot_off_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?love|love)'), love_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?gift|gift)'), gift_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?trollsave|trollsave)'), trollsave_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?troll|troll)'), troll_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?trollstop|trollstop)'), trollstop_command))
+    app.add_handler(MessageHandler(filters.Regex(r'^([/\.]?all|all)'), all_command))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    app.add_handler(MessageHandler(filters.Regex(r"^\.all "), all_command))
+
     print("✅ Бот запущен!")
     app.run_polling()
