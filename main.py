@@ -4,10 +4,7 @@ import asyncio
 import random
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    filters, ContextTypes
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 # -----------------------
 # 🔑 Конфигурация
@@ -47,32 +44,20 @@ LOVE_LEVELS = [
     (96, 100, "💍 Судьба связала вас навсегда."),
 ]
 
-GIFS_LIST = [
-    "https://media.giphy.com/media/3o7TKtnuHOHHUjR38Y/giphy.gif",
-    "https://media.giphy.com/media/l0HlSNOxJB956qwfK/giphy.gif",
-    "https://media.giphy.com/media/26xBzuZ9LOiOi4L0w/giphy.gif",
-    "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif",
-    "https://media.giphy.com/media/3o6ZsYxVf0A3p7Q8Ve/giphy.gif",
-    "https://media.giphy.com/media/26FPJGjhefSJuaRhu/giphy.gif",
-    "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
+GIFTS_ROMANTIC = ["💐 Букет слов и немного нежности", "🍫 Шоколад из чувства симпатии"]
+GIFTS_FUNNY = ["🍕 Один кусочек любви и три крошки заботы", "🍟 Картошка с соусом симпатии"]
+
+GIFS = [
+    "https://media.giphy.com/media/3o6gbbuLW76jkt8vIc/giphy.gif",
+    "https://media.giphy.com/media/l4pTfx2qLszoacZRS/giphy.gif",
+    "https://media.giphy.com/media/3o7TKPZqzNRejT7Nko/giphy.gif",
     "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif",
 ]
 
-used_gifs = set()
-
-GIFTS_ROMANTIC = [
-    "💐 Букет слов и немного нежности",
-    "🍫 Шоколад из чувства симпатии",
-    "🎁 Мелочь, но от всего сердца",
-]
-GIFTS_FUNNY = [
-    "🍕 Один кусочек любви и три крошки заботы",
-    "🍟 Картошка с соусом симпатии",
-    "🎈 Воздушный шарик заботы",
-]
+sent_gifs = set()
 
 # -----------------------
-# 🌐 Мини-вебсервер (Render)
+# 🌐 Мини-вебсервер (для Render)
 # -----------------------
 def run_web():
     class Handler(BaseHTTPRequestHandler):
@@ -80,6 +65,7 @@ def run_web():
             self.send_response(200)
             self.end_headers()
             self.wfile.write("LoveBot is alive 💖".encode("utf-8"))
+
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
@@ -96,14 +82,37 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
         print("LOG:", text)
 
 # -----------------------
-# ⚙️ Помощник для сохранения чатов
+# ⚙️ Помощник для сохранения всех чатов
 # -----------------------
 async def save_chat(update: Update):
     if update.effective_chat:
         last_messages[update.effective_chat.id] = update.effective_chat.id
 
 # -----------------------
-# ⚙️ /start только в ЛС
+# ⚙️ Команды включения/выключения
+# -----------------------
+async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_chat(update)
+    global bot_active
+    if update.effective_user.id != OWNER_ID:
+        await update.message.reply_text("🚫 Только владелец может включить бота.")
+        return
+    bot_active = True
+    await update.message.reply_text("🔔 Бот снова активен!")
+    await send_log(context, "Бот включён.")
+
+async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_chat(update)
+    global bot_active
+    if update.effective_user.id != OWNER_ID:
+        await update.message.reply_text("🚫 Только владелец может выключить бота.")
+        return
+    bot_active = False
+    await update.message.reply_text("⚠️ Бот отключён.")
+    await send_log(context, "Бот отключён.")
+
+# -----------------------
+# /start — только в ЛС
 # -----------------------
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
@@ -114,13 +123,13 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Команды:\n"
         "/love <@username> — проверить совместимость 💘\n"
         "/gift <@username> — отправить подарок 🎁\n"
-        "/gif — случайный GIF 💫\n"
+        "/gif — присылаю рандомные гифки 🎬\n"
         "/onbot /offbot — включить/выключить бота (только владелец)\n"
         "/all <текст> — рассылка всем (только владелец)"
     )
 
 # -----------------------
-# 💌 /love
+# 💌 /love — эффектная версия
 # -----------------------
 async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
@@ -157,14 +166,13 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         phrase = random.choice(LOVE_PHRASES + LOVE_JOKES + SPECIAL_PHRASES)
         final_text = f"💖 *{category}*\n🌸 {phrase}\n💬 Истинная любовь всегда найдёт путь 💫"
         await context.bot.send_message(chat_id=update.effective_chat.id, text=final_text, parse_mode="Markdown")
-
         await send_log(context, f"/love: @{initiator} -> @{target} = {score}%")
     except Exception as e:
         print("Ошибка /love:", e)
         await send_log(context, f"Ошибка /love: {e}")
 
 # -----------------------
-# 🎁 /gift
+# 🎁 /gift — мощная версия
 # -----------------------
 async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
@@ -191,27 +199,20 @@ async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/gift: @{giver} -> @{target} ({gift})")
 
 # -----------------------
-# 💫 /gif — уникальные GIF
+# 🎬 /gif — рандомные гифы
 # -----------------------
 async def gif_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
     if update.message is None:
         return
-    global used_gifs
-    if len(used_gifs) == len(GIFS_LIST):
-        used_gifs.clear()
-    available_gifs = [g for g in GIFS_LIST if g not in used_gifs]
-    gif_url = random.choice(available_gifs)
-    used_gifs.add(gif_url)
-    thinking_msg = await update.message.reply_text("💫 Подбираем уникальный GIF...")
-    await asyncio.sleep(0.8)
-    try:
-        await context.bot.send_animation(chat_id=update.effective_chat.id, animation=gif_url)
-        await thinking_msg.delete()
-        await send_log(context, f"/gif вызван в чате {update.effective_chat.id}")
-    except Exception as e:
-        print("Ошибка /gif:", e)
-        await send_log(context, f"Ошибка /gif: {e}")
+    global sent_gifs
+    available = list(set(GIFS) - sent_gifs)
+    if not available:
+        sent_gifs = set()
+        available = GIFS.copy()
+    chosen = random.choice(available)
+    sent_gifs.add(chosen)
+    await update.message.reply_animation(chosen)
 
 # -----------------------
 # /all — рассылка всем
