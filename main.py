@@ -21,9 +21,7 @@ LOG_CHANNEL_ID = -1003107269526
 bot_active = True
 last_messages = {}  # chat_id -> chat_id
 
-# -----------------------
 # ❤️ Романтические данные
-# -----------------------
 LOVE_PHRASES = [
     "Ты мне дорог", "Я рад, что ты есть", "Ты особенная",
     "Ты мой человек", "Ты делаешь день лучше", "Ты просто счастье",
@@ -53,14 +51,28 @@ GIFS_LIST = [
     "https://media.giphy.com/media/3o7TKtnuHOHHUjR38Y/giphy.gif",
     "https://media.giphy.com/media/l0HlSNOxJB956qwfK/giphy.gif",
     "https://media.giphy.com/media/26xBzuZ9LOiOi4L0w/giphy.gif",
-    "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif"
+    "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif",
+    "https://media.giphy.com/media/3o6ZsYxVf0A3p7Q8Ve/giphy.gif",
+    "https://media.giphy.com/media/26FPJGjhefSJuaRhu/giphy.gif",
+    "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
+    "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif",
 ]
 
-GIFTS_ROMANTIC = ["💐 Букет слов и немного нежности", "🍫 Шоколад из чувства симпатии"]
-GIFTS_FUNNY = ["🍕 Один кусочек любви и три крошки заботы", "🍟 Картошка с соусом симпатии"]
+used_gifs = set()
+
+GIFTS_ROMANTIC = [
+    "💐 Букет слов и немного нежности",
+    "🍫 Шоколад из чувства симпатии",
+    "🎁 Мелочь, но от всего сердца",
+]
+GIFTS_FUNNY = [
+    "🍕 Один кусочек любви и три крошки заботы",
+    "🍟 Картошка с соусом симпатии",
+    "🎈 Воздушный шарик заботы",
+]
 
 # -----------------------
-# 🌐 Мини-вебсервер (для Render)
+# 🌐 Мини-вебсервер (Render)
 # -----------------------
 def run_web():
     class Handler(BaseHTTPRequestHandler):
@@ -68,7 +80,6 @@ def run_web():
             self.send_response(200)
             self.end_headers()
             self.wfile.write("LoveBot is alive 💖".encode("utf-8"))
-
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
@@ -92,30 +103,7 @@ async def save_chat(update: Update):
         last_messages[update.effective_chat.id] = update.effective_chat.id
 
 # -----------------------
-# ⚙️ Команды включения/выключения
-# -----------------------
-async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await save_chat(update)
-    global bot_active
-    if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("🚫 Только владелец может включать бота.")
-        return
-    bot_active = True
-    await update.message.reply_text("🔔 Бот снова активен!")
-    await send_log(context, "Бот включён.")
-
-async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await save_chat(update)
-    global bot_active
-    if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("🚫 Только владелец может выключать бота.")
-        return
-    bot_active = False
-    await update.message.reply_text("⚠️ Бот отключён. Отвечает только на команды.")
-    await send_log(context, "Бот отключён.")
-
-# -----------------------
-# /start — только в ЛС
+# ⚙️ /start только в ЛС
 # -----------------------
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
@@ -126,13 +114,13 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Команды:\n"
         "/love <@username> — проверить совместимость 💘\n"
         "/gift <@username> — отправить подарок 🎁\n"
-        "/gif — получить случайный GIF 💫\n"
+        "/gif — случайный GIF 💫\n"
         "/onbot /offbot — включить/выключить бота (только владелец)\n"
         "/all <текст> — рассылка всем (только владелец)"
     )
 
 # -----------------------
-# 💌 /love — эффектная версия
+# 💌 /love
 # -----------------------
 async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
@@ -176,7 +164,7 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_log(context, f"Ошибка /love: {e}")
 
 # -----------------------
-# 🎁 /gift — мощная версия
+# 🎁 /gift
 # -----------------------
 async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
@@ -189,11 +177,11 @@ async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     giver = update.effective_user.username or update.effective_user.first_name
     target = args[1].replace("@", "")
     gift = random.choice(GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY)
-    msg = await update.message.reply_text(f"🎁 @{giver} дарит @{target} подарок:\n🎁 …")
+    msg = await update.message.reply_text(f"🎁 @{giver} дарит @{target} подарок...\n🎁 …")
     for _ in range(2):
         await asyncio.sleep(0.15)
         try:
-            await msg.edit_text(f"🎁 @{giver} дарит @{target} подарок:\n🎁 🎉")
+            await msg.edit_text(f"🎁 @{giver} дарит @{target} подарок...\n🎁 🎉")
         except Exception:
             pass
     try:
@@ -203,15 +191,20 @@ async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/gift: @{giver} -> @{target} ({gift})")
 
 # -----------------------
-# 💫 /gif — эффектно
+# 💫 /gif — уникальные GIF
 # -----------------------
 async def gif_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
     if update.message is None:
         return
-    thinking_msg = await update.message.reply_text("💫 Подбираем идеальный GIF...")
-    await asyncio.sleep(1)
-    gif_url = random.choice(GIFS_LIST)
+    global used_gifs
+    if len(used_gifs) == len(GIFS_LIST):
+        used_gifs.clear()
+    available_gifs = [g for g in GIFS_LIST if g not in used_gifs]
+    gif_url = random.choice(available_gifs)
+    used_gifs.add(gif_url)
+    thinking_msg = await update.message.reply_text("💫 Подбираем уникальный GIF...")
+    await asyncio.sleep(0.8)
     try:
         await context.bot.send_animation(chat_id=update.effective_chat.id, animation=gif_url)
         await thinking_msg.delete()
