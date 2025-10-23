@@ -19,9 +19,11 @@ if not TELEGRAM_TOKEN:
 OWNER_ID = 8486672898
 LOG_CHANNEL_ID = -1003107269526
 bot_active = True
-last_messages = {}
+last_messages = {}  # chat_id -> chat_id
 
-# ❤️ Романтика и гифки
+# -----------------------
+# ❤️ Данные LoveBot
+# -----------------------
 LOVE_PHRASES = [
     "Ты мне дорог", "Я рад, что ты есть", "Ты особенная",
     "Ты мой человек", "Ты делаешь день лучше", "Ты просто счастье",
@@ -47,19 +49,11 @@ LOVE_LEVELS = [
     (96, 100, "💍 Судьба связала вас навсегда."),
 ]
 
-GIFTS_ROMANTIC = ["💐 Букет слов и немного нежности", "🍫 Шоколад из чувства симпатии"]
-GIFTS_FUNNY = ["🍕 Один кусочек любви и три крошки заботы", "🍟 Картошка с соусом симпатии"]
-
-GIFS = {
-    "romantic": [
-        "https://media.giphy.com/media/3o6Zt6ML6BklcajjsA/giphy.gif",
-        "https://media.giphy.com/media/l0MYB8Ory7Hqefo9a/giphy.gif",
-    ],
-    "funny": [
-        "https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif",
-        "https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif",
-    ]
-}
+GIFS_LIST = [
+    "https://media.giphy.com/media/3o6ZsY6N0g5cN6E8sQ/giphy.gif",
+    "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
+    "https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif"
+]
 
 # -----------------------
 # 🌐 Мини-вебсервер
@@ -87,37 +81,14 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
         print("LOG:", text)
 
 # -----------------------
-# ⚙️ Сохраняем активный чат
+# ⚙️ Помощник для сохранения чатов
 # -----------------------
 async def save_chat(update: Update):
     if update.effective_chat:
         last_messages[update.effective_chat.id] = update.effective_chat.id
 
 # -----------------------
-# ⚙️ Вкл/выкл бота
-# -----------------------
-async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await save_chat(update)
-    global bot_active
-    if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("🚫 Только владелец может включать бота.")
-        return
-    bot_active = True
-    await update.message.reply_text("🔔 Бот снова активен!")
-    await send_log(context, "Бот включён.")
-
-async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await save_chat(update)
-    global bot_active
-    if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("🚫 Только владелец может выключать бота.")
-        return
-    bot_active = False
-    await update.message.reply_text("⚠️ Бот отключён. Отвечает только на команды.")
-    await send_log(context, "Бот отключён.")
-
-# -----------------------
-# /start — только ЛС
+# ⚙️ /start — только в ЛС
 # -----------------------
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
@@ -188,22 +159,12 @@ async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     giver = update.effective_user.username or update.effective_user.first_name
     target = args[1].replace("@", "")
-    gift = random.choice(GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY)
-    msg = await update.message.reply_text(f"🎁 @{giver} дарит @{target} подарок:\n🎁 …")
-    for _ in range(2):
-        await asyncio.sleep(0.15)
-        try:
-            await msg.edit_text(f"🎁 @{giver} дарит @{target} подарок:\n🎁 🎉")
-        except Exception:
-            pass
-    try:
-        await msg.edit_text(f"🎁 @{giver} дарит @{target} подарок:\n{gift}")
-    except Exception:
-        pass
-    await send_log(context, f"/gift: @{giver} -> @{target} ({gift})")
+    gift_text = random.choice(GIFS_LIST)
+    await update.message.reply_text(f"🎁 @{giver} дарит @{target} гифку:\n{gift_text}")
+    await send_log(context, f"/gift: @{giver} -> @{target} ({gift_text})")
 
 # -----------------------
-# /all — рассылка всем
+# /all
 # -----------------------
 async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
@@ -226,23 +187,7 @@ async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/all: отправлено в {count} чатов.")
 
 # -----------------------
-# 🖼 Авто-гифки
-# -----------------------
-async def auto_gifs(app):
-    while True:
-        if last_messages and bot_active:
-            chat_id = random.choice(list(last_messages.keys()))
-            category = random.choice(["romantic", "funny"])
-            gif_url = random.choice(GIFS.get(category, GIFS["romantic"]))
-            try:
-                await app.bot.send_animation(chat_id=chat_id, animation=gif_url)
-                await send_log(None, f"Авто-гифка ({category}) отправлена в чат {chat_id}")
-            except Exception as e:
-                print("Ошибка авто-гифки:", e)
-        await asyncio.sleep(random.randint(1800, 5400))
-
-# -----------------------
-# 💬 Обработка всех сообщений
+# 💬 Обработка сообщений
 # -----------------------
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message:
@@ -251,24 +196,37 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # -----------------------
+# 🌟 Фоновая задача — случайная GIF каждые 5 минут
+# -----------------------
+async def auto_gifs(app: ApplicationBuilder):
+    await asyncio.sleep(10)  # старт через 10 секунд
+    while True:
+        if last_messages:
+            chat_id = random.choice(list(last_messages.keys()))
+            gif = random.choice(GIFS_LIST)
+            try:
+                await app.bot.send_message(chat_id=chat_id, text=f"💌 Сюрприз-гивка для тебя!\n{gif}")
+            except Exception:
+                pass
+        await asyncio.sleep(300)  # каждые 5 минут
+
+# -----------------------
 # 🚀 Запуск
 # -----------------------
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # команды
+    # Команды
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CommandHandler("onbot", onbot))
     app.add_handler(CommandHandler("offbot", offbot))
     app.add_handler(CommandHandler("love", love_cmd))
     app.add_handler(CommandHandler("gift", gift_cmd))
     app.add_handler(CommandHandler("all", all_cmd))
-
-    # логируем текстовые сообщения
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_messages))
 
-    # авто-гифки
-    asyncio.create_task(auto_gifs(app))
+    # Запуск фоновой задачи через loop бота
+    app.create_task(auto_gifs(app))
 
-    print("✅ LoveBot запущен и готов к романтике 💞 и гифкам 🖼")
+    print("✅ LoveBot с GIF запущен!")
     app.run_polling()
