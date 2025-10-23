@@ -47,6 +47,17 @@ LOVE_LEVELS = [
     (96, 100, "💍 Судьба связала вас навсегда."),
 ]
 
+GIFTS_ROMANTIC = [
+    "💐 Букет слов и немного нежности",
+    "🍫 Шоколад из чувства симпатии",
+    "🌹 Романтический сюрприз"
+]
+GIFTS_FUNNY = [
+    "🍕 Один кусочек любви и три крошки заботы",
+    "🍟 Картошка с соусом симпатии",
+    "🎈 Юмористический подарок с приветом"
+]
+
 # -----------------------
 # 🌐 Мини-вебсервер (для Render)
 # -----------------------
@@ -56,6 +67,7 @@ def run_web():
             self.send_response(200)
             self.end_headers()
             self.wfile.write("LoveBot is alive 💖".encode("utf-8"))
+
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
@@ -72,7 +84,7 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
         print("LOG:", text)
 
 # -----------------------
-# ⚙️ Включение/выключение бота
+# ⚙️ Вкл/выкл бота
 # -----------------------
 async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot_active
@@ -93,7 +105,20 @@ async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, "Бот отключён.")
 
 # -----------------------
-# 💌 /love — мощная версия
+# /start
+# -----------------------
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "💞 Привет! Я LoveBot.\n"
+        "Команды:\n"
+        "/love — проверить совместимость 💘\n"
+        "/gift — подарить подарок 🎁\n"
+        "/all <текст> — рассылка по всем чатам (только владелец)\n"
+        "/onbot /offbot — включить/выключить бота (только владелец)"
+    )
+
+# -----------------------
+# /love — романтика вау
 # -----------------------
 async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None or not bot_active:
@@ -109,98 +134,86 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         hearts = "❤️" * (filled // 2)
         bars = hearts + "🖤" * (bar_len - len(hearts))
 
-        # 🔹 Вступление
+        # Вступление
         await update.message.reply_text("💘 Определяем уровень любви...")
         await asyncio.sleep(0.5)
-
-        # 🔹 Атмосфера
         atmosphere = random.choice([
             "✨ Судьба соединяет сердца...",
             "💞 Любовь витает в воздухе...",
             "🌹 Сердца бьются всё чаще...",
-            "🔥 Между вами искра...",
+            "🔥 Между вами искра..."
         ])
         await context.bot.send_message(chat_id=update.effective_chat.id, text=atmosphere)
         await asyncio.sleep(0.7)
 
-        # 🔹 Результат
+        # Результат
         result_text = f"💞 @{initiator} 💖 @{target}\n💘 Совместимость: {score}%\n[{bars}]"
         await context.bot.send_message(chat_id=update.effective_chat.id, text=result_text)
         await asyncio.sleep(0.5)
 
-        # 🔹 Финал с эмоциями
+        # Финал
         category = next((lbl for (lo, hi, lbl) in LOVE_LEVELS if lo <= score <= hi), "💞 Нежные чувства")
         phrase = random.choice(LOVE_PHRASES + LOVE_JOKES + SPECIAL_PHRASES)
         final_text = f"💖 *{category}*\n🌸 {phrase}\n💬 Истинная любовь всегда найдёт путь 💫"
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=final_text, parse_mode="Markdown")
-
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=final_text,
+            parse_mode="Markdown"
+        )
         await send_log(context, f"/love: @{initiator} -> @{target} = {score}%")
     except Exception as e:
         print("Ошибка /love:", e)
         await send_log(context, f"Ошибка /love: {e}")
 
 # -----------------------
-# 🎁 /gift — эффектная версия
+# /gift — вау подарок
 # -----------------------
 async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None or not bot_active:
         return
-
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
         await update.message.reply_text("🎁 Используй: /gift @username")
         return
-
     giver = update.effective_user.username or update.effective_user.first_name
     target = args[1].replace("@", "")
-
-    gifts_common = ["🍫 Шоколад из сладких чувств", "💐 Букет утренней нежности", "🍓 Коробка поцелуев", "🕯 Свеча тепла и заботы"]
-    gifts_rare = ["💎 Осколок звезды, сияющий как ты", "🌙 Луч лунного света в баночке", "💌 Письмо из будущего, где вы вместе"]
-    gifts_legendary = ["🔥 Сердце феникса — вечная страсть", "🌌 Вселенная, в которой вы вдвоём", "💞 Любовь, которая не знает конца"]
-
-    rarity = random.choices(["common", "rare", "legendary"], [70, 25, 5])[0]
-    if rarity == "legendary":
-        gift = random.choice(gifts_legendary)
-        color = "✨"
-    elif rarity == "rare":
-        gift = random.choice(gifts_rare)
-        color = "💎"
-    else:
-        gift = random.choice(gifts_common)
-        color = "🎀"
-
-    animation_frames = [
-        f"🎁 @{giver} готовит подарок для @{target}...",
-        f"{color*2} @{giver} несёт подарок... {color*2}",
-        f"💫 Подарок раскрывается... 💫",
-        f"💖 @{giver} дарит @{target}: \n{gift}",
-    ]
-
-    msg = await update.message.reply_text(animation_frames[0])
-    for frame in animation_frames[1:]:
-        await asyncio.sleep(0.7)
+    gift = random.choice(GIFTS_ROMANTIC if random.choice([True, False]) else GIFTS_FUNNY)
+    msg = await update.message.reply_text(f"🎁 @{giver} дарит @{target} подарок...\n🎁 …")
+    for _ in range(2):
+        await asyncio.sleep(0.15)
         try:
-            await msg.edit_text(frame)
+            await msg.edit_text(f"🎁 @{giver} дарит @{target} подарок...\n🎁 🎉")
         except Exception:
             pass
-
-    if rarity in ["rare", "legendary"]:
-        extra_effect = random.choice([
-            "🌹 Пусть этот момент останется в сердце навсегда.",
-            "💞 Мир замирает, когда любовь говорит без слов.",
-            "🌈 Это не просто подарок — это кусочек души.",
-            "🔥 Огонь страсти вспыхнул ярче солнца!",
-        ])
-        await asyncio.sleep(1)
-        try:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=extra_effect)
-        except Exception:
-            pass
-
-    await send_log(context, f"/gift: @{giver} -> @{target} ({gift}) [{rarity}]")
+    try:
+        await msg.edit_text(f"🎁 @{giver} дарит @{target} подарок:\n{gift}")
+    except Exception:
+        pass
+    await send_log(context, f"/gift: @{giver} -> @{target} ({gift})")
 
 # -----------------------
-# 💬 Обработка сообщений
+# /all — рассылка (только владелец)
+# -----------------------
+async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message is None or update.effective_user.id != OWNER_ID:
+        return
+    text = update.message.text.partition(' ')[2].strip()
+    if not text:
+        await update.message.reply_text("❌ Введи текст для рассылки: /all <текст>")
+        return
+    count = 0
+    for chat_id in list(last_messages.keys()):
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=text)
+            count += 1
+            await asyncio.sleep(0.02)
+        except Exception:
+            continue
+    await update.message.reply_text(f"✅ Рассылка завершена, отправлено в ~{count} чатов.")
+    await send_log(context, f"/all: отправлено в {count} чатов.")
+
+# -----------------------
+# Логируем чаты
 # -----------------------
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None:
@@ -213,20 +226,20 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # -----------------------
-# 🚀 Запуск
+# 🚀 Запуск бота
 # -----------------------
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # команды управления
+    # Основные команды
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("onbot", onbot))
     app.add_handler(CommandHandler("offbot", offbot))
-
-    # романтика
     app.add_handler(CommandHandler("love", love_cmd))
     app.add_handler(CommandHandler("gift", gift_cmd))
+    app.add_handler(CommandHandler("all", all_cmd))
 
-    # логирование сообщений
+    # Логируем все текстовые сообщения
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_messages))
 
     print("✅ LoveBot запущен и готов к романтике 💞")
