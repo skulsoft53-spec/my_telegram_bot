@@ -2,7 +2,6 @@ import os
 import threading
 import asyncio
 import random
-import re
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import (
@@ -20,7 +19,7 @@ if not TELEGRAM_TOKEN:
 OWNER_ID = 8486672898
 LOG_CHANNEL_ID = -1003107269526
 bot_active = True
-last_messages = {}
+last_messages = {}  # chat_id -> chat_id
 
 # ❤️ Романтические данные
 LOVE_PHRASES = [
@@ -48,20 +47,11 @@ LOVE_LEVELS = [
     (96, 100, "💍 Судьба связала вас навсегда."),
 ]
 
-GIFTS_ROMANTIC = [
-    "💐 Букет слов и немного нежности",
-    "🍫 Шоколад из чувства симпатии",
-    "🌹 Цветы и нежные объятия",
-    "💌 Романтическое послание с сердцем"
-]
-GIFTS_FUNNY = [
-    "🍕 Один кусочек любви и три крошки заботы",
-    "🍟 Картошка с соусом симпатии",
-    "🎁 Мешок смеха и хорошего настроения"
-]
+GIFTS_ROMANTIC = ["💐 Букет слов и немного нежности", "🍫 Шоколад из чувства симпатии"]
+GIFTS_FUNNY = ["🍕 Один кусочек любви и три крошки заботы", "🍟 Картошка с соусом симпатии"]
 
 # -----------------------
-# 🌐 Мини-вебсервер (Render)
+# 🌐 Мини-вебсервер (для Render)
 # -----------------------
 def run_web():
     class Handler(BaseHTTPRequestHandler):
@@ -86,9 +76,17 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
         print("LOG:", text)
 
 # -----------------------
+# ⚙️ Помощник для сохранения всех чатов
+# -----------------------
+async def save_chat(update: Update):
+    if update.effective_chat:
+        last_messages[update.effective_chat.id] = update.effective_chat.id
+
+# -----------------------
 # ⚙️ Команды включения/выключения
 # -----------------------
 async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_chat(update)
     global bot_active
     if update.effective_user.id != OWNER_ID:
         await update.message.reply_text("🚫 Только владелец может включать бота.")
@@ -98,6 +96,7 @@ async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, "Бот включён.")
 
 async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_chat(update)
     global bot_active
     if update.effective_user.id != OWNER_ID:
         await update.message.reply_text("🚫 Только владелец может выключать бота.")
@@ -112,19 +111,21 @@ async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
         return
+    await save_chat(update)
     await update.message.reply_text(
         "💞 Привет! Я LoveBot 💖\n"
         "Команды:\n"
-        "/love — проверить совместимость 💘\n"
-        "/gift — подарить подарок 🎁\n"
-        "/onbot /offbot — включить/выключить бота (только создатель)\n"
-        "/all <текст> — отправка всем (только владелец)"
+        "/love <@username> — проверить совместимость 💘\n"
+        "/gift <@username> — отправить подарок 🎁\n"
+        "/onbot /offbot — включить/выключить бота (только владелец)\n"
+        "/all <текст> — рассылка всем (только владелец)"
     )
 
 # -----------------------
-# /love — эффектная версия
+# 💌 /love — эффектная версия
 # -----------------------
 async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_chat(update)
     if update.message is None or not bot_active:
         return
     try:
@@ -138,11 +139,9 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         hearts = "❤️" * (filled // 2)
         bars = hearts + "🖤" * (bar_len - len(hearts))
 
-        # Вступление
         await update.message.reply_text("💘 Определяем уровень любви...")
         await asyncio.sleep(0.5)
 
-        # Атмосфера
         atmosphere = random.choice([
             "✨ Судьба соединяет сердца...",
             "💞 Любовь витает в воздухе...",
@@ -152,37 +151,25 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=update.effective_chat.id, text=atmosphere)
         await asyncio.sleep(0.7)
 
-        # Результат
-        result_text = (
-            f"💞 @{initiator} 💖 @{target}\n"
-            f"💘 Совместимость: {score}%\n"
-            f"[{bars}]"
-        )
+        result_text = f"💞 @{initiator} 💖 @{target}\n💘 Совместимость: {score}%\n[{bars}]"
         await context.bot.send_message(chat_id=update.effective_chat.id, text=result_text)
         await asyncio.sleep(0.5)
 
-        # Финал с эмоциями
         category = next((lbl for (lo, hi, lbl) in LOVE_LEVELS if lo <= score <= hi), "💞 Нежные чувства")
         phrase = random.choice(LOVE_PHRASES + LOVE_JOKES + SPECIAL_PHRASES)
-        final_text = (
-            f"💖 *{category}*\n"
-            f"🌸 {phrase}\n"
-            f"💬 Истинная любовь всегда найдёт путь 💫"
-        )
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=final_text,
-            parse_mode="Markdown"
-        )
+        final_text = f"💖 *{category}*\n🌸 {phrase}\n💬 Истинная любовь всегда найдёт путь 💫"
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=final_text, parse_mode="Markdown")
+
         await send_log(context, f"/love: @{initiator} -> @{target} = {score}%")
     except Exception as e:
         print("Ошибка /love:", e)
         await send_log(context, f"Ошибка /love: {e}")
 
 # -----------------------
-# /gift — эффектная версия
+# 🎁 /gift — мощная версия
 # -----------------------
 async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_chat(update)
     if update.message is None or not bot_active:
         return
     args = update.message.text.split(maxsplit=1)
@@ -206,13 +193,14 @@ async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/gift: @{giver} -> @{target} ({gift})")
 
 # -----------------------
-# /all — рассылка по сохранённым чатам
+# /all — рассылка всем
 # -----------------------
 async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_chat(update)
     if update.effective_user.id != OWNER_ID:
         await update.message.reply_text("🚫 Только владелец может использовать /all")
         return
-    text = re.sub(r'^/all\s+', '', update.message.text, flags=re.I).strip()
+    text = update.message.text.partition(" ")[2].strip()
     if not text:
         await update.message.reply_text("❌ Введи текст: /all <текст>")
         return
@@ -224,15 +212,15 @@ async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(0.02)
         except Exception:
             continue
-    await update.message.reply_text(f"✅ Рассылка завершена, отправлено в {count} чатов.")
+    await update.message.reply_text(f"✅ Рассылка завершена, отправлено в ~{count} чатов.")
     await send_log(context, f"/all: отправлено в {count} чатов.")
 
 # -----------------------
-# Логирование чатов
+# 💬 Обработка всех текстовых сообщений
 # -----------------------
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat:
-        last_messages[update.effective_chat.id] = update.effective_chat.id
+    if update.message:
+        await save_chat(update)
     if not bot_active:
         return
 
@@ -250,7 +238,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("gift", gift_cmd))
     app.add_handler(CommandHandler("all", all_cmd))
 
-    # Логирование всех сообщений
+    # Логирование всех текстовых сообщений
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_messages))
 
     print("✅ LoveBot запущен и готов к романтике 💞")
