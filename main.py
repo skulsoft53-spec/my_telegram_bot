@@ -80,11 +80,16 @@ HUG_GIFS = [
     "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
     "https://media.giphy.com/media/3oz8xAf8hGqJwzN1hG/giphy.gif",
     "https://media.giphy.com/media/xT9IgIc0lryrxvqVGM/giphy.gif",
-    "https://media.giphy.com/media/3o7aD5tv1ogNBtDhDi/giphy.gif",
-    "https://media.giphy.com/media/l4pTfx2qLszoacZRS/giphy.gif",
-    "https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif",
-    "https://media.giphy.com/media/3ohc1h8TbCac4z6l8Q/giphy.gif",
-    "https://media.giphy.com/media/3o6Zt6ML6BklcajjsA/giphy.gif",
+    "https://media.giphy.com/media/l41YtZOb9EUABnuqA/giphy.gif",
+    "https://media.giphy.com/media/l0MYsZMh7zUHE6P0k/giphy.gif",
+    "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif",
+    "https://media.giphy.com/media/3o7TKP7z3a6fXdfpYE/giphy.gif",
+    "https://media.giphy.com/media/3oEjHGRp2JXWl5uQXe/giphy.gif",
+    "https://media.giphy.com/media/l0Exk8EUzSLsrErEQ/giphy.gif",
+    "https://media.giphy.com/media/3o6ZsYQG5VwrnO3t2A/giphy.gif",
+    "https://media.giphy.com/media/l4FGGafcOHmrlQxG0/giphy.gif",
+    "https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif",
+    "https://media.giphy.com/media/3o7aD4z5tT5u2Q7YhO/giphy.gif",
 ]
 
 sent_kiss_gifs = set()
@@ -121,9 +126,9 @@ threading.Thread(target=run_web, daemon=True).start()
 # 📜 Логирование
 # -----------------------
 async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
+    if "Conflict" in text:
+        return  # Игнорируем конфликт
     try:
-        if "Conflict" in text:
-            return  # Игнорируем ошибку конфликта
         if context and context.bot:
             await context.bot.send_message(chat_id=LOG_CHANNEL_ID, text=text)
     except Exception:
@@ -212,7 +217,7 @@ async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/kiss: @{sender} -> @{target} ({text})")
 
 # -----------------------
-# 💘 /love — совместимость
+# 💘 /love
 # -----------------------
 async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update, context)
@@ -233,7 +238,7 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/love: @{sender} ❤️ @{target} = {love_percent}%")
 
 # -----------------------
-# 🎁 /gift — подарки
+# 🎁 /gift
 # -----------------------
 async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update, context)
