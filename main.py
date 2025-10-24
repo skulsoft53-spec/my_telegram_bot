@@ -2,9 +2,17 @@ import os
 import threading
 import asyncio
 import random
+import time
+import requests
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes
+)
 
 # -----------------------
 # 🔑 Конфигурация
@@ -69,7 +77,7 @@ GIFTS_FUNNY = [
 ]
 
 # -----------------------
-# 🌐 Мини-вебсервер
+# 🌐 Мини-вебсервер (Render ping)
 # -----------------------
 def run_web():
     class Handler(BaseHTTPRequestHandler):
@@ -79,6 +87,7 @@ def run_web():
             self.wfile.write("LoveBot is alive 💖".encode("utf-8"))
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
+
 threading.Thread(target=run_web, daemon=True).start()
 
 # -----------------------
@@ -122,31 +131,6 @@ async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, "Бот отключён.")
 
 # -----------------------
-# 💌 /all — рассылка для владельца
-# -----------------------
-async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await save_chat(update, context)
-    if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("🚫 Только владелец может делать рассылку.")
-        return
-    if len(context.args) == 0:
-        await update.message.reply_text("💬 Используй: /all <сообщение>")
-        return
-
-    text = " ".join(context.args)
-    count = 0
-    for chat_id in list(last_messages.values()):
-        try:
-            await context.bot.send_message(chat_id=chat_id, text=text)
-            count += 1
-            await asyncio.sleep(0.2)
-        except Exception:
-            continue
-
-    await update.message.reply_text(f"✅ Рассылка завершена. Сообщение отправлено {count} чатам.")
-    await send_log(context, f"📢 Рассылка: '{text}' ({count} чатов)")
-
-# -----------------------
 # 💋 /kiss — поцелуи и объятия
 # -----------------------
 async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -172,6 +156,7 @@ async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not available:
         sent_set.clear()
         available = gifs.copy()
+
     gif = random.choice(available)
     sent_set.add(gif)
 
@@ -255,20 +240,43 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
         pass
 
 # -----------------------
-# 🚀 Запуск
+# 🚀 Запуск с автофиксом конфликтов
 # -----------------------
 if __name__ == "__main__":
+    import telegram.error
+
+    # 🧹 Удаляем старый webhook (Render Web Service режим)
+    try:
+        requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook")
+        print("🧹 Старый webhook удалён (Render режим).")
+    except Exception as e:
+        print(f"Не удалось удалить webhook: {e}")
+
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CommandHandler("onbot", onbot))
     app.add_handler(CommandHandler("offbot", offbot))
-    app.add_handler(CommandHandler("all", all_cmd))
     app.add_handler(CommandHandler("kiss", kiss_cmd))
     app.add_handler(CommandHandler("love", love_cmd))
     app.add_handler(CommandHandler("gift", gift_cmd))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), save_chat))
     app.add_error_handler(error_handler)
 
-    print("✅ LoveBot запущен и готов к романтике 💞")
-    app.run_polling()
+    print("✅ LoveBot готов к запуску!")
+
+    while True:
+        try:
+            print("💞 LoveBot запущен и готов к романтике!")
+            app.run_polling()
+        except telegram.error.Conflict:
+            print("⚠️ Конфликт: другой экземпляр работает. Повтор через 3 сек...")
+            time.sleep(3)
+            try:
+                requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook")
+            except Exception:
+                pass
+            continue
+        except Exception as e:
+            print(f"💥 Ошибка: {e}")
+            time.sleep(5)
