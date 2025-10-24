@@ -16,7 +16,7 @@ if not TELEGRAM_TOKEN:
 OWNER_ID = 8486672898
 LOG_CHANNEL_ID = -1003107269526
 bot_active = True
-last_messages = {}  # chat_id -> chat_id
+last_messages = {}
 
 # ❤️ Романтические данные
 LOVE_PHRASES = [
@@ -44,9 +44,6 @@ LOVE_LEVELS = [
     (96, 100, "💍 Судьба связала вас навсегда."),
 ]
 
-GIFTS_ROMANTIC = ["💐 Букет слов и немного нежности", "🍫 Шоколад из чувства симпатии"]
-GIFTS_FUNNY = ["🍕 Один кусочек любви и три крошки заботы", "🍟 Картошка с соусом симпатии"]
-
 GIFS = [
     "https://media.giphy.com/media/3o6gbbuLW76jkt8vIc/giphy.gif",
     "https://media.giphy.com/media/l4pTfx2qLszoacZRS/giphy.gif",
@@ -54,10 +51,13 @@ GIFS = [
     "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif",
 ]
 
+GIFTS_ROMANTIC = ["💐 Букет слов и немного нежности", "🍫 Шоколад из чувства симпатии"]
+GIFTS_FUNNY = ["🍕 Один кусочек любви и три крошки заботы", "🍟 Картошка с соусом симпатии"]
+
 sent_gifs = set()
 
 # -----------------------
-# 🌐 Мини-вебсервер (для Render)
+# 🌐 Мини-вебсервер
 # -----------------------
 def run_web():
     class Handler(BaseHTTPRequestHandler):
@@ -65,10 +65,8 @@ def run_web():
             self.send_response(200)
             self.end_headers()
             self.wfile.write("LoveBot is alive 💖".encode("utf-8"))
-
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
-
 threading.Thread(target=run_web, daemon=True).start()
 
 # -----------------------
@@ -81,9 +79,6 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
     except Exception:
         print("LOG:", text)
 
-# -----------------------
-# ⚙️ Помощник для сохранения всех чатов
-# -----------------------
 async def save_chat(update: Update):
     if update.effective_chat:
         last_messages[update.effective_chat.id] = update.effective_chat.id
@@ -112,7 +107,7 @@ async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, "Бот отключён.")
 
 # -----------------------
-# /start — только в ЛС
+# /start
 # -----------------------
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
@@ -123,13 +118,14 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Команды:\n"
         "/love <@username> — проверить совместимость 💘\n"
         "/gift <@username> — отправить подарок 🎁\n"
-        "/gif — присылаю рандомные гифки 🎬\n"
+        "/kiss <@username> — поцелуй или объятие 😘\n"
+        "/gif — рандомные гифки 🎬\n"
         "/onbot /offbot — включить/выключить бота (только владелец)\n"
         "/all <текст> — рассылка всем (только владелец)"
     )
 
 # -----------------------
-# 💌 /love — эффектная версия
+# 💌 /love
 # -----------------------
 async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
@@ -172,7 +168,7 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_log(context, f"Ошибка /love: {e}")
 
 # -----------------------
-# 🎁 /gift — мощная версия
+# 🎁 /gift
 # -----------------------
 async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
@@ -199,7 +195,81 @@ async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/gift: @{giver} -> @{target} ({gift})")
 
 # -----------------------
-# 🎬 /gif — рандомные гифы
+# 😘 /kiss — поцелуи и объятия + редкий эффект судьбы
+# -----------------------
+KISS_GIFS = [
+    "https://media.giphy.com/media/G3va31oEEnIkM/giphy.gif",
+    "https://media.giphy.com/media/11rWoZNpAKw8w/giphy.gif",
+    "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
+    "https://media.giphy.com/media/3o6Zt6ML6BklcajjsA/giphy.gif",
+]
+HUG_GIFS = [
+    "https://media.giphy.com/media/lrr9rHuoJOE0w/giphy.gif",
+    "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif",
+    "https://media.giphy.com/media/3M4NpbLCTxBqU/giphy.gif",
+    "https://media.giphy.com/media/BXrwTdoho6hkQ/giphy.gif",
+]
+RARE_GIFS = [
+    "https://media.giphy.com/media/l3vR85PnGsBwu1PFK/giphy.gif",
+    "https://media.giphy.com/media/5GoVLqeAOo6PK/giphy.gif",
+]
+
+sent_kiss_gifs = set()
+sent_hug_gifs = set()
+
+async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_chat(update)
+    if not bot_active or update.message is None:
+        return
+
+    args = update.message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await update.message.reply_text("😘 Используй: /kiss @username — чтобы отправить поцелуй или объятие 💋")
+        return
+
+    sender = update.effective_user.username or update.effective_user.first_name
+    target = args[1].replace("@", "")
+
+    # 🎆 Редкий шанс судьбы (1 из 20)
+    if random.randint(1, 20) == 1:
+        rare_gif = random.choice(RARE_GIFS)
+        await update.message.reply_text(f"💘 Судьба соединила @{sender} и @{target}! Это редкий момент 💫")
+        await asyncio.sleep(0.6)
+        await update.message.reply_animation(rare_gif)
+        await asyncio.sleep(0.4)
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="💞 Пусть ваши сердца всегда будут рядом 💞")
+        await send_log(context, f"/kiss RARE: @{sender} -> @{target}")
+        return
+
+    action = random.choice(["kiss", "hug"])
+    if action == "kiss":
+        gifs, sent_set, emoji, text = KISS_GIFS, sent_kiss_gifs, "💋", "поцелуй"
+    else:
+        gifs, sent_set, emoji, text = HUG_GIFS, sent_hug_gifs, "🤗", "объятие"
+
+    available = list(set(gifs) - sent_set)
+    if not available:
+        sent_set.clear()
+        available = gifs.copy()
+    gif = random.choice(available)
+    sent_set.add(gif)
+
+    await update.message.reply_text(f"{emoji} @{sender} отправляет @{target} {text}...")
+    await asyncio.sleep(0.5)
+    await update.message.reply_animation(gif)
+    await asyncio.sleep(0.5)
+    phrase = random.choice([
+        "💞 Между вами пробежала искра нежности!",
+        "💖 Любовь витает в воздухе!",
+        "🌸 Тепло и нежность переплелись вместе.",
+        "💫 Пусть этот момент длится вечно!",
+        "🔥 Сердца бьются в унисон.",
+    ])
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=phrase)
+    await send_log(context, f"/kiss: @{sender} -> @{target} ({text})")
+
+# -----------------------
+# 🎬 /gif
 # -----------------------
 async def gif_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
@@ -208,14 +278,14 @@ async def gif_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global sent_gifs
     available = list(set(GIFS) - sent_gifs)
     if not available:
-        sent_gifs = set()
+        sent_gifs.clear()
         available = GIFS.copy()
-    chosen = random.choice(available)
-    sent_gifs.add(chosen)
-    await update.message.reply_animation(chosen)
+    gif = random.choice(available)
+    sent_gifs.add(gif)
+    await update.message.reply_animation(gif)
 
 # -----------------------
-# /all — рассылка всем
+# /all
 # -----------------------
 async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update)
@@ -238,31 +308,20 @@ async def all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/all: отправлено в {count} чатов.")
 
 # -----------------------
-# 💬 Обработка всех текстовых сообщений
-# -----------------------
-async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message:
-        await save_chat(update)
-    if not bot_active:
-        return
-
-# -----------------------
 # 🚀 Запуск
 # -----------------------
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # Команды
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CommandHandler("onbot", onbot))
     app.add_handler(CommandHandler("offbot", offbot))
     app.add_handler(CommandHandler("love", love_cmd))
     app.add_handler(CommandHandler("gift", gift_cmd))
+    app.add_handler(CommandHandler("kiss", kiss_cmd))
     app.add_handler(CommandHandler("gif", gif_cmd))
     app.add_handler(CommandHandler("all", all_cmd))
-
-    # Логирование всех текстовых сообщений
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_messages))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), save_chat))
 
     print("✅ LoveBot запущен и готов к романтике 💞")
     app.run_polling()
