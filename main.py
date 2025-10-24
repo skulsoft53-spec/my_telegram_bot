@@ -26,7 +26,9 @@ LOG_CHANNEL_ID = -1003107269526
 bot_active = True
 last_messages = {}
 
+# -----------------------
 # ❤️ Романтические данные
+# -----------------------
 LOVE_PHRASES = [
     "Ты мне дорог", "Я рад, что ты есть", "Ты особенная",
     "Ты мой человек", "Ты делаешь день лучше", "Ты просто счастье",
@@ -44,14 +46,20 @@ LOVE_LEVELS = [
     (96, 100, "💍 Судьба связала вас навсегда."),
 ]
 
-# 💋 Гифки /kiss
+# -----------------------
+# 💋 GIF для /kiss — самые страстные
+# -----------------------
 KISS_GIFS = [
-    "https://media.giphy.com/media/l0MYC0LajbaPoEADu/giphy.gif",
-    "https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif",
-    "https://media.giphy.com/media/ZqlvCTNHpqrio/giphy.gif",
-    "https://media.giphy.com/media/wnsgren9NtITS/giphy.gif",
-    "https://media.giphy.com/media/12VXIxKaIEarL2/giphy.gif",
-    "https://media.giphy.com/media/FqBTvSNjNzeZG/giphy.gif",
+    "https://media.giphy.com/media/l0MYC0LajbaPoEADu/giphy.gif",  # поцелуй под дождем
+    "https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif",      # страстный поцелуй
+    "https://media.giphy.com/media/ZqlvCTNHpqrio/giphy.gif",      # романтический момент
+    "https://media.giphy.com/media/wnsgren9NtITS/giphy.gif",       # медленный нежный поцелуй
+    "https://media.giphy.com/media/12VXIxKaIEarL2/giphy.gif",     # улыбка и нежность
+    "https://media.giphy.com/media/FqBTvSNjNzeZG/giphy.gif",      # страсть и любовь
+    "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif", # страстный поцелуй в засос
+    "https://media.giphy.com/media/l0ExncehJzexFpRHq/giphy.gif",  # поцелуй в засос
+    "https://media.giphy.com/media/3o7TKPZqzNRejT7Nko/giphy.gif", # объятия и любовь
+    "https://media.giphy.com/media/1BXa2alBjrCXC/giphy.gif",      # страстные объятия
 ]
 HUG_GIFS = [
     "https://media.giphy.com/media/sUIZWMnfd4Mb6/giphy.gif",
@@ -60,11 +68,14 @@ HUG_GIFS = [
     "https://media.giphy.com/media/143vPc6b08locw/giphy.gif",
     "https://media.giphy.com/media/3bqtLDeiDtwhq/giphy.gif",
     "https://media.giphy.com/media/XpgOZHuDfIkoM/giphy.gif",
+    "https://media.giphy.com/media/1BXa2alBjrCXC/giphy.gif",  # страстные объятия
 ]
 sent_kiss_gifs = set()
 sent_hug_gifs = set()
 
+# -----------------------
 # 🎁 Подарки
+# -----------------------
 GIFTS_ROMANTIC = [
     "💐 Букет слов и немного нежности",
     "🍫 Шоколад из чувства симпатии",
@@ -108,7 +119,7 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_messages[update.effective_chat.id] = update.effective_chat.id
 
 # -----------------------
-# ⚙️ Команды включения/выключения
+# ⚙️ Включение/выключение
 # -----------------------
 async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update, context)
@@ -131,13 +142,12 @@ async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, "Бот отключён.")
 
 # -----------------------
-# 💋 /kiss — поцелуи и объятия
+# 💋 /kiss
 # -----------------------
 async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update, context)
     if not bot_active or update.message is None:
         return
-
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
         await update.message.reply_text("😘 Используй: /kiss @username — чтобы отправить поцелуй или объятие 💋")
@@ -145,7 +155,6 @@ async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sender = update.effective_user.username or update.effective_user.first_name
     target = args[1].replace("@", "")
-
     action = random.choice(["kiss", "hug"])
     if action == "kiss":
         gifs, sent_set, emoji, text = KISS_GIFS, sent_kiss_gifs, "💋", "поцелуй"
@@ -156,7 +165,6 @@ async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not available:
         sent_set.clear()
         available = gifs.copy()
-
     gif = random.choice(available)
     sent_set.add(gif)
 
@@ -175,7 +183,7 @@ async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/kiss: @{sender} -> @{target} ({text})")
 
 # -----------------------
-# 💘 /love — совместимость
+# 💘 /love
 # -----------------------
 async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update, context)
@@ -185,7 +193,6 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 2:
         await update.message.reply_text("💘 Используй: /love @username — чтобы узнать совместимость 💞")
         return
-
     target = args[1].replace("@", "")
     sender = update.effective_user.username or update.effective_user.first_name
     love_percent = random.randint(0, 100)
@@ -196,7 +203,7 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, f"/love: @{sender} ❤️ @{target} = {love_percent}%")
 
 # -----------------------
-# 🎁 /gift — подарки
+# 🎁 /gift
 # -----------------------
 async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update, context)
@@ -206,7 +213,6 @@ async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 2:
         await update.message.reply_text("🎁 Используй: /gift @username — чтобы отправить подарок 💌")
         return
-
     sender = update.effective_user.username or update.effective_user.first_name
     target = args[1].replace("@", "")
     gift = random.choice(GIFTS_ROMANTIC + GIFTS_FUNNY)
@@ -240,12 +246,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
         pass
 
 # -----------------------
-# 🚀 Запуск с автофиксом конфликтов
+# 🚀 Запуск
 # -----------------------
 if __name__ == "__main__":
     import telegram.error
 
-    # 🧹 Удаляем старый webhook (Render Web Service режим)
     try:
         requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook")
         print("🧹 Старый webhook удалён (Render режим).")
