@@ -3,7 +3,6 @@ import threading
 import asyncio
 import random
 import time
-import requests
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import (
@@ -26,9 +25,7 @@ LOG_CHANNEL_ID = -1003107269526
 bot_active = True
 last_messages = {}
 
-# -----------------------
 # ❤️ Романтические данные
-# -----------------------
 LOVE_PHRASES = [
     "Ты мне дорог", "Я рад, что ты есть", "Ты особенная",
     "Ты мой человек", "Ты делаешь день лучше", "Ты просто счастье",
@@ -36,6 +33,7 @@ LOVE_PHRASES = [
     "Ты мое чудо", "Ты наполняешь день теплом", "Ты моя радость",
     "С тобой спокойно", "Ты просто невероятна", "Ты мой уют", "Ты моё всё"
 ]
+
 LOVE_LEVELS = [
     (0, 10, "💔 Лёд между сердцами..."),
     (11, 25, "🌧️ Едва заметная искра."),
@@ -46,21 +44,30 @@ LOVE_LEVELS = [
     (96, 100, "💍 Судьба связала вас навсегда."),
 ]
 
-# -----------------------
-# 💋 GIF для /kiss — самые страстные
-# -----------------------
+# 💋 /kiss — страстные поцелуи и объятия
 KISS_GIFS = [
-    "https://media.giphy.com/media/l0MYC0LajbaPoEADu/giphy.gif",  # поцелуй под дождем
-    "https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif",      # страстный поцелуй
-    "https://media.giphy.com/media/ZqlvCTNHpqrio/giphy.gif",      # романтический момент
-    "https://media.giphy.com/media/wnsgren9NtITS/giphy.gif",       # медленный нежный поцелуй
-    "https://media.giphy.com/media/12VXIxKaIEarL2/giphy.gif",     # улыбка и нежность
-    "https://media.giphy.com/media/FqBTvSNjNzeZG/giphy.gif",      # страсть и любовь
-    "https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif", # страстный поцелуй в засос
-    "https://media.giphy.com/media/l0ExncehJzexFpRHq/giphy.gif",  # поцелуй в засос
-    "https://media.giphy.com/media/3o7TKPZqzNRejT7Nko/giphy.gif", # объятия и любовь
-    "https://media.giphy.com/media/1BXa2alBjrCXC/giphy.gif",      # страстные объятия
+    "https://media.giphy.com/media/l0MYC0LajbaPoEADu/giphy.gif",
+    "https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif",
+    "https://media.giphy.com/media/ZqlvCTNHpqrio/giphy.gif",
+    "https://media.giphy.com/media/wnsgren9NtITS/giphy.gif",
+    "https://media.giphy.com/media/12VXIxKaIEarL2/giphy.gif",
+    "https://media.giphy.com/media/FqBTvSNjNzeZG/giphy.gif",
+    "https://media.giphy.com/media/1BXa2alBjrCXC/giphy.gif",
+    "https://media.giphy.com/media/3o7TKPZqzNRejT7Nko/giphy.gif",
+    "https://media.giphy.com/media/3o6gbbuLW76jkt8vIc/giphy.gif",
+    "https://media.giphy.com/media/3oKIPwoeGErMmaI43C/giphy.gif",
+    "https://media.giphy.com/media/l0HlOvJ7yaacpuSas/giphy.gif",
+    "https://media.giphy.com/media/l41lI4bYmcsPJX9Go/giphy.gif",
+    "https://media.giphy.com/media/xT9KVHk1QzV6g/giphy.gif",
+    "https://media.giphy.com/media/l0MYEqEzwMWFCg8rm/giphy.gif",
+    "https://media.giphy.com/media/3o6ZsX2rh8R81p17Ty/giphy.gif",
+    "https://media.giphy.com/media/3oEjHP8ELRNNlnlLGM/giphy.gif",
+    "https://media.giphy.com/media/3oEjHT7eL7bQ5V8i3i/giphy.gif",
+    "https://media.giphy.com/media/xT9IgIc0lryrxvqVGM/giphy.gif",
+    "https://media.giphy.com/media/3oz8xKaR836UJOYeOc/giphy.gif",
+    "https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif"
 ]
+
 HUG_GIFS = [
     "https://media.giphy.com/media/sUIZWMnfd4Mb6/giphy.gif",
     "https://media.giphy.com/media/od5H3PmEG5EVq/giphy.gif",
@@ -68,14 +75,26 @@ HUG_GIFS = [
     "https://media.giphy.com/media/143vPc6b08locw/giphy.gif",
     "https://media.giphy.com/media/3bqtLDeiDtwhq/giphy.gif",
     "https://media.giphy.com/media/XpgOZHuDfIkoM/giphy.gif",
-    "https://media.giphy.com/media/1BXa2alBjrCXC/giphy.gif",  # страстные объятия
+    "https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif",
+    "https://media.giphy.com/media/3o7TKPZqzNRejT7Nko/giphy.gif",
+    "https://media.giphy.com/media/3oKIPwoeGErMmaI43C/giphy.gif",
+    "https://media.giphy.com/media/3oEjHP8ELRNNlnlLGM/giphy.gif",
+    "https://media.giphy.com/media/3oEjHT7eL7bQ5V8i3i/giphy.gif",
+    "https://media.giphy.com/media/xT9IgIc0lryrxvqVGM/giphy.gif",
+    "https://media.giphy.com/media/3oz8xKaR836UJOYeOc/giphy.gif",
+    "https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif",
+    "https://media.giphy.com/media/12VXIxKaIEarL2/giphy.gif",
+    "https://media.giphy.com/media/1BXa2alBjrCXC/giphy.gif",
+    "https://media.giphy.com/media/l41lI4bYmcsPJX9Go/giphy.gif",
+    "https://media.giphy.com/media/FqBTvSNjNzeZG/giphy.gif",
+    "https://media.giphy.com/media/3o6gbbuLW76jkt8vIc/giphy.gif",
+    "https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif"
 ]
+
 sent_kiss_gifs = set()
 sent_hug_gifs = set()
 
-# -----------------------
 # 🎁 Подарки
-# -----------------------
 GIFTS_ROMANTIC = [
     "💐 Букет слов и немного нежности",
     "🍫 Шоколад из чувства симпатии",
@@ -88,7 +107,7 @@ GIFTS_FUNNY = [
 ]
 
 # -----------------------
-# 🌐 Мини-вебсервер (Render ping)
+# 🌐 Мини-вебсервер (для Render Web Service)
 # -----------------------
 def run_web():
     class Handler(BaseHTTPRequestHandler):
@@ -119,7 +138,7 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_messages[update.effective_chat.id] = update.effective_chat.id
 
 # -----------------------
-# ⚙️ Включение/выключение
+# ⚙️ Команды включения/выключения
 # -----------------------
 async def onbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update, context)
@@ -148,18 +167,20 @@ async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await save_chat(update, context)
     if not bot_active or update.message is None:
         return
+
     args = update.message.text.split(maxsplit=1)
     if len(args) < 2:
-        await update.message.reply_text("😘 Используй: /kiss @username — чтобы отправить поцелуй или объятие 💋")
+        await update.message.reply_text("😘 Используй: /kiss @username — чтобы отправить страстный поцелуй или объятие 💋")
         return
 
     sender = update.effective_user.username or update.effective_user.first_name
     target = args[1].replace("@", "")
+
     action = random.choice(["kiss", "hug"])
     if action == "kiss":
-        gifs, sent_set, emoji, text = KISS_GIFS, sent_kiss_gifs, "💋", "поцелуй"
+        gifs, sent_set, emoji, text = KISS_GIFS, sent_kiss_gifs, "💋", "страстный поцелуй"
     else:
-        gifs, sent_set, emoji, text = HUG_GIFS, sent_hug_gifs, "🤗", "объятие"
+        gifs, sent_set, emoji, text = HUG_GIFS, sent_hug_gifs, "🤗", "страстное объятие"
 
     available = list(set(gifs) - sent_set)
     if not available:
@@ -173,11 +194,11 @@ async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_animation(gif)
     await asyncio.sleep(0.5)
     phrase = random.choice([
-        "💞 Между вами пробежала искра нежности!",
-        "💖 Любовь витает в воздухе!",
-        "🌸 Тепло и нежность переплелись вместе.",
-        "💫 Пусть этот момент длится вечно!",
-        "🔥 Сердца бьются в унисон.",
+        "💞 Между вами вспыхнула страсть!",
+        "💖 Любовь кипит в воздухе!",
+        "🔥 Сердца пылают в унисон!",
+        "🌹 Страсть переплелась с нежностью!",
+        "💫 Пусть этот момент горит вечно!"
     ])
     await context.bot.send_message(chat_id=update.effective_chat.id, text=phrase)
     await send_log(context, f"/kiss: @{sender} -> @{target} ({text})")
@@ -193,6 +214,7 @@ async def love_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 2:
         await update.message.reply_text("💘 Используй: /love @username — чтобы узнать совместимость 💞")
         return
+
     target = args[1].replace("@", "")
     sender = update.effective_user.username or update.effective_user.first_name
     love_percent = random.randint(0, 100)
@@ -213,6 +235,7 @@ async def gift_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 2:
         await update.message.reply_text("🎁 Используй: /gift @username — чтобы отправить подарок 💌")
         return
+
     sender = update.effective_user.username or update.effective_user.first_name
     target = args[1].replace("@", "")
     gift = random.choice(GIFTS_ROMANTIC + GIFTS_FUNNY)
@@ -250,12 +273,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 # -----------------------
 if __name__ == "__main__":
     import telegram.error
-
-    try:
-        requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook")
-        print("🧹 Старый webhook удалён (Render режим).")
-    except Exception as e:
-        print(f"Не удалось удалить webhook: {e}")
+    import requests
 
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
@@ -268,7 +286,12 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), save_chat))
     app.add_error_handler(error_handler)
 
-    print("✅ LoveBot готов к запуску!")
+    # Render Web Service — удаляем старый webhook
+    try:
+        requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook")
+        print("🧹 Старый webhook удалён (Render режим).")
+    except Exception as e:
+        print(f"Не удалось удалить webhook: {e}")
 
     while True:
         try:
@@ -281,7 +304,6 @@ if __name__ == "__main__":
                 requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook")
             except Exception:
                 pass
-            continue
         except Exception as e:
             print(f"💥 Ошибка: {e}")
             time.sleep(5)
