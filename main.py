@@ -2,16 +2,9 @@ import os
 import threading
 import asyncio
 import random
-import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    ContextTypes
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 # -----------------------
 # 🔑 Конфигурация
@@ -57,15 +50,6 @@ KISS_GIFS = [
     "https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif",
     "https://media.giphy.com/media/3o7qDEq2bMbcbPRQ2c/giphy.gif",
     "https://media.giphy.com/media/l0HlvtIPzPdt2usKs/giphy.gif",
-    "https://media.giphy.com/media/xUPGcgtKxm4XlPZy7y/giphy.gif",
-    "https://media.giphy.com/media/3o7aD6N0CvlV8xBkqQ/giphy.gif",
-    "https://media.giphy.com/media/l41YtZOb9EUABnuqA/giphy.gif",
-    "https://media.giphy.com/media/3oz8xIQDfxaB8V1bAA/giphy.gif",
-    "https://media.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif",
-    "https://media.giphy.com/media/l0ExncehJzexFpRHq/giphy.gif",
-    "https://media.giphy.com/media/11cT0zEoXgK1bO/giphy.gif",
-    "https://media.giphy.com/media/3o6Zt6ML6BklcajjsA/giphy.gif",
-    "https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif",
 ]
 
 # 🤗 /hug — страстные объятия
@@ -79,17 +63,6 @@ HUG_GIFS = [
     "https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif",
     "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
     "https://media.giphy.com/media/3oz8xAf8hGqJwzN1hG/giphy.gif",
-    "https://media.giphy.com/media/xT9IgIc0lryrxvqVGM/giphy.gif",
-    "https://media.giphy.com/media/3o7aD5tv1ogNBtDhDi/giphy.gif",
-    "https://media.giphy.com/media/l4pTfx2qLszoacZRS/giphy.gif",
-    "https://media.giphy.com/media/3oEjHP8ELRNNlnlLGM/giphy.gif",
-    "https://media.giphy.com/media/xT0GqssRweIhlz209i/giphy.gif",
-    "https://media.giphy.com/media/3ohs4BSacFKI7A717y/giphy.gif",
-    "https://media.giphy.com/media/3o6Mbq3l5QXgM0xO1e/giphy.gif",
-    "https://media.giphy.com/media/xT9IglpY5mqL3CmcV6/giphy.gif",
-    "https://media.giphy.com/media/3o6ZsZCDqclEdrwUVS/giphy.gif",
-    "https://media.giphy.com/media/xT1XGzZ0J5Tkh0Qz6Q/giphy.gif",
-    "https://media.giphy.com/media/3o6ZsZ7sKJhwHczmJi/giphy.gif",
 ]
 
 sent_kiss_gifs = set()
@@ -109,7 +82,7 @@ GIFTS_FUNNY = [
 ]
 
 # -----------------------
-# 🌐 Мини-вебсервер
+# 🌐 Мини-вебсервер (Render ping)
 # -----------------------
 def run_web():
     class Handler(BaseHTTPRequestHandler):
@@ -119,13 +92,14 @@ def run_web():
             self.wfile.write("LoveBot is alive 💖".encode("utf-8"))
     port = int(os.environ.get("PORT", 10000))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
+
 threading.Thread(target=run_web, daemon=True).start()
 
 # -----------------------
 # 📜 Логирование
 # -----------------------
 async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
-    if "Conflict" in text:
+    if "Conflict" in text:  # Игнорируем конфликты
         return
     try:
         if context and context.bot:
@@ -164,7 +138,7 @@ async def offbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, "Бот отключён.")
 
 # -----------------------
-# 💋 /kiss — страстные поцелуи и объятия
+# 💋 /kiss — страстные поцелуи и объятия, параллельно
 # -----------------------
 async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global last_action
@@ -201,9 +175,13 @@ async def kiss_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     gif = random.choice(available)
     sent_set.add(gif)
 
-    await update.message.reply_text(f"{emoji} @{sender} отправляет @{target} {text}...")
+    # Параллельная отправка
+    asyncio.create_task(send_kiss_hug(update, context, sender, target, emoji, text, gif))
+
+async def send_kiss_hug(update, context, sender, target, emoji, text, gif):
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{emoji} @{sender} отправляет @{target} {text}...")
     await asyncio.sleep(0.5)
-    await update.message.reply_animation(gif)
+    await context.bot.send_animation(chat_id=update.effective_chat.id, animation=gif)
     await asyncio.sleep(0.5)
     phrase = random.choice([
         "💞 Между вами пробежала искра нежности!",
