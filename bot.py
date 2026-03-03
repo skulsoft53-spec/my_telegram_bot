@@ -1,34 +1,36 @@
-import logging
 import os
 import re
+import logging
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
-from aiogram.utils.executor import start_webhook
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiogram.filters import Command
 from spellchecker import SpellChecker
 
-# ====== НАСТРОЙКИ ======
-API_TOKEN = os.getenv("BOT_TOKEN")
-if not API_TOKEN:
+# ===== НАСТРОЙКИ =====
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
     raise ValueError("Не указан BOT_TOKEN")
 
+WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+WEBHOOK_SECRET = "supersecret"
 WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL")
-WEBHOOK_PATH = f"/webhook/{API_TOKEN}"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
-WEBAPP_HOST = "0.0.0.0"
-WEBAPP_PORT = int(os.getenv("PORT", 10000))
+PORT = int(os.getenv("PORT", 10000))
 
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 spell = SpellChecker(language="ru")
 
-existing_biographies_texts = []  # сюда можно добавить базу биографий
+existing_biographies_texts = []  # сюда можно добавить базу сохранённых биографий
 
 
-# ====== СТАРТ ======
-@dp.message_handler(commands=["start"])
-async def start(message: types.Message):
+# ===== Команда /start =====
+@dp.message(Command("start"))
+async def start_handler(message: types.Message):
     await message.answer(
         "📄 Отправьте RP биографию одним сообщением.\n\n"
         "Заголовок: Биография | Nick_Name\n"
@@ -37,95 +39,73 @@ async def start(message: types.Message):
     )
 
 
-# ====== ПРОВЕРКА ======
-@dp.message_handler(content_types=types.ContentTypes.ANY)
+# ===== Проверка биографии =====
+@dp.message()
 async def check_bio(message: types.Message):
-
     if not message.text:
         await message.answer("❌ Биография должна быть отправлена текстом.")
         return
 
     text = message.text
     lines = text.split("\n")
-    reasons = []
+    reasons_minor = []  # на доработку
+    reasons_major = []  # отклонение
 
     words = re.findall(r"\w+", text, flags=re.UNICODE)
     word_count = len(words)
 
-    # 1.1 Заголовок
+    # ===== Критические ошибки =====
+    fantasy_words = ["маг","бессмерт","телепорт","суперсил","невидим","вампир","демон"]
+    if any(word in text.lower() for word in fantasy_words):
+        reasons_major.append("Обнаружены сверхспособности (нереалистичный персонаж).")
+
+    real_people = ["брэд питт","аль капоне","elon musk"]
+    if any(name in text.lower() for name in real_people):
+        reasons_major.append("Запрещено писать биографию существующей личности.")
+
+    forbidden = ["убиваю всех","маньяк","террорист","насильник","психически больной"]
+    if any(word in text.lower() for word in forbidden):
+        reasons_major.append("Биография содержит запрещённые элементы.")
+
+    # ===== Мелкие ошибки =====
     title = lines[0].strip()
     if not re.match(r"^Биография \| [A-Za-zА-Яа-я0-9_]+$", title):
-        reasons.append("1.1 Неверный формат заголовка.")
+        reasons_minor.append("Неверный формат заголовка.")
 
-    # 1.9 Объём
     if word_count < 200:
-        reasons.append(f"1.9 Недостаточный объём ({word_count} слов, минимум 200).")
-    if word_count > 600:
-        reasons.append(f"1.9 Превышен объём ({word_count} слов, максимум 600).")
+        reasons_minor.append(f"Недостаточный объём ({word_count} слов). Минимум 200.")
+    elif word_count > 600:
+        reasons_minor.append(f"Превышен объём ({word_count} слов). Максимум 600.")
 
-    # 1.5 Орфография
-    filtered_words = [w.lower() for w in words if len(w) > 2 and not re.search(r"\d", w)]
-    misspelled = spell.unknown(filtered_words)
-    if len(misspelled) > 5:
-        reasons.append("1.5 Слишком много орфографических ошибок.")
+    if not message.photo:
+        reasons_minor.append("Отсутствуют прикреплённые фотографии.")
 
-    # 1.6 Шрифт
     font_match = re.search(r"Font=([\w\s]+)\|Size=(\d+)", text)
     if font_match:
         font = font_match.group(1).strip().lower()
         size = int(font_match.group(2))
-        if font not in ["times new roman", "verdana"] or size < 15:
-            reasons.append("1.6 Неверный шрифт или размер (минимум 15).")
+        if font not in ["times new roman","verdana"]:
+            reasons_minor.append("Разрешён только Times New Roman или Verdana.")
+        if size < 15:
+            reasons_minor.append("Размер шрифта должен быть не менее 15.")
     else:
-        reasons.append("1.6 Не указан шрифт и размер.")
+        reasons_minor.append("Не указан шрифт и размер в формате Font=...|Size=...")
 
-    # 1.7 Фото
-    if not message.photo:
-        reasons.append("1.7 Отсутствуют прикреплённые фотографии.")
+    filtered_words = [w.lower() for w in words if len(w) > 2 and not re.search(r"\d", w)]
+    misspelled = spell.unknown(filtered_words)
+    if len(misspelled) > 5:
+        reasons_minor.append(f"Слишком много орфографических ошибок (пример: {', '.join(list(misspelled)[:5])}).")
 
-    # 1.2 Сверхспособности
-    fantasy_words = [
-        "маг", "бессмерт", "телепорт", "суперсил",
-        "невидим", "вампир", "оборотень", "демон", "сверхспособ"
-    ]
-    if any(word in text.lower() for word in fantasy_words):
-        reasons.append("1.2 Обнаружены сверхспособности (нереалистичный персонаж).")
-
-    # 1.3 Реальные личности
-    real_people = [
-        "брэд питт", "аль капоне", "elon musk",
-        "владимир путин", "джефф безос"
-    ]
-    if any(name in text.lower() for name in real_people):
-        reasons.append("1.3 Биография существующей личности запрещена.")
-
-    # 1.8 Нарушение правил сервера
-    forbidden_behavior = [
-        "убиваю всех", "маньяк", "террорист",
-        "насильник", "психически больной"
-    ]
-    if any(word in text.lower() for word in forbidden_behavior):
-        reasons.append("1.8 Биография содержит запрещённые факторы.")
-
-    # 1.10 Логические противоречия (возраст)
     age_match = re.search(r"Возраст:\s*(\d+)", text)
     if age_match:
         age = int(age_match.group(1))
         if age < 18 and "университет" in text.lower():
-            reasons.append("1.10 Возраст не соответствует обучению в университете.")
+            reasons_minor.append("Возраст не соответствует обучению в университете.")
         if age < 21 and "бизнес" in text.lower():
-            reasons.append("1.10 Возраст не соответствует ведению бизнеса.")
+            reasons_minor.append("Возраст не соответствует ведению бизнеса.")
     else:
-        reasons.append("Не указан возраст.")
+        reasons_minor.append("Не указан возраст персонажа.")
 
-    # 1.4 Проверка копирования
-    for existing in existing_biographies_texts:
-        overlap = set(text.lower().split()) & set(existing.lower().split())
-        if len(overlap) / max(len(text.split()), 1) > 0.5:
-            reasons.append("1.4 Биография слишком похожа на существующую.")
-            break
-
-    # Проверка структуры
     required_sections = [
         "Имя и фамилия персонажа:",
         "Пол:",
@@ -138,38 +118,52 @@ async def check_bio(message: types.Message):
         "Настоящее время:",
         "Итог:"
     ]
-
     for section in required_sections:
         if section.lower() not in text.lower():
-            reasons.append(f"Отсутствует раздел: {section}")
+            reasons_minor.append(f"Отсутствует раздел: {section}")
 
-    # ===== ИТОГ =====
-    if not reasons:
-        await message.answer("✅ Биография одобрена.")
+    # ===== Итог =====
+    if reasons_major:
+        msg = "❌ Биография отклонена (критические ошибки):\n\n"
+        for r in reasons_major:
+            msg += f"• {r}\n"
+        msg += "\nИсправить невозможно — отправьте новую биографию."
+    elif reasons_minor:
+        msg = "⚠️ Биография на доработке:\n\n"
+        for r in reasons_minor:
+            msg += f"• {r}\n"
+        msg += "\n⏳ У вас есть 24 часа на исправление и повторную отправку."
     else:
-        msg = "❌ Биография отклонена по причинам:\n\n"
-        for r in reasons:
-            msg += f"- {r}\n"
-        await message.answer(msg)
+        msg = "✅ Биография одобрена.\n\nВаша RP биография соответствует правилам."
+
+    await message.answer(msg)
 
 
 # ===== WEBHOOK =====
-async def on_startup(dp):
-    if WEBHOOK_HOST:
-        await bot.set_webhook(WEBHOOK_URL)
-        print("Webhook установлен:", WEBHOOK_URL)
+async def on_startup(app):
+    await bot.set_webhook(WEBHOOK_URL, secret_token=WEBHOOK_SECRET)
+    logging.info(f"Webhook установлен: {WEBHOOK_URL}")
 
-async def on_shutdown(dp):
+
+async def on_shutdown(app):
     await bot.delete_webhook()
 
 
-if __name__ == "__main__":
-    start_webhook(
+def main():
+    app = web.Application()
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+
+    SimpleRequestHandler(
         dispatcher=dp,
-        webhook_path=WEBHOOK_PATH,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
-        skip_updates=True,
-        host=WEBAPP_HOST,
-        port=WEBAPP_PORT,
-    )
+        bot=bot,
+        secret_token=WEBHOOK_SECRET,
+    ).register(app, path=WEBHOOK_PATH)
+
+    setup_application(app, dp, bot=bot)
+
+    web.run_app(app, host="0.0.0.0", port=PORT)
+
+
+if __name__ == "__main__":
+    main()
