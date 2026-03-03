@@ -25,7 +25,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 spell = SpellChecker(language="ru")
 
-existing_biographies_texts = []  # сюда можно добавить базу сохранённых биографий
+existing_biographies_texts = []  # сюда можно добавить сохранённые биографии
 
 
 # ===== Команда /start =====
