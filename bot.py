@@ -1,10 +1,28 @@
 import asyncio
 import os
 import time
+import threading
+from flask import Flask
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
+
 import yt_dlp
 
+# Flask для Render Web Service
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is running"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+threading.Thread(target=run_web).start()
+
+# Telegram bot
 TOKEN = os.getenv("TOKEN")
 
 bot = Bot(token=TOKEN)
