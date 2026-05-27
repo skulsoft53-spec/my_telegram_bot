@@ -5,11 +5,14 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from flask import Flask
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
+from aiogram.types import FSInputFile
+
 import yt_dlp
 
-# ----------------- WEB SERVER (Render) -----------------
+# ----------------- FLASK (Render Web Service) -----------------
 
 app = Flask(__name__)
 
@@ -22,58 +25,77 @@ def run_web():
     app.run(host="0.0.0.0", port=port)
 
 
-# ----------------- TELEGRAM BOT -----------------
+# ----------------- BOT -----------------
 
-TOKEN = os.getenv("TOKEN")
+TOKEN = os.getenv("TOKEN")  # ⚠️ положи TOKEN в Render ENV
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 executor = ThreadPoolExecutor(max_workers=3)
-semaphore = asyncio.Semaphore(3)
+semaphore = asyncio.Semaphore(2)
 
 
-# ----------------- DOWNLOAD FUNCTIONS -----------------
+# ----------------- FILE CHECK -----------------
 
-def download_video_sync(url, filename):
+def wait_file(path, timeout=20):
+    start = time.time()
+    while time.time() - start < timeout:
+        if os.path.exists(path) and os.path.getsize(path) > 0:
+            return True
+        time.sleep(0.5)
+    return False
+
+
+# ----------------- DOWNLOAD VIDEO -----------------
+
+def download_video(url, filename):
     ydl_opts = {
         "outtmpl": filename,
-        "format": "mp4",
-        "quiet": True,
+        "format": "best",  # стабильнее чем mp4
         "noplaylist": True,
+        "quiet": True,
+        "retries": 10,
+        "socket_timeout": 30,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
 
-def download_audio_sync(url, filename_base):
+# ----------------- DOWNLOAD AUDIO -----------------
+
+def download_audio(url, filename_base):
     ydl_opts = {
-        "format": "bestaudio/best",
         "outtmpl": filename_base,
+        "format": "bestaudio/best",
+        "noplaylist": True,
+        "quiet": True,
+        "retries": 10,
+        "socket_timeout": 30,
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }],
-        "quiet": True,
-        "noplaylist": True,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
 
-# ----------------- COMMANDS -----------------
+# ----------------- START -----------------
 
 @dp.message(CommandStart())
 async def start(message: types.Message):
     await message.answer(
         "👋 Отправь TikTok ссылку\n\n"
         "📹 Я скачаю видео\n"
-        "🎵 и сразу музыку из него"
+        "🎵 и отдельно музыку"
     )
 
+
+# ----------------- MAIN HANDLER -----------------
 
 @dp.message()
 async def handler(message: types.Message):
@@ -84,7 +106,7 @@ async def handler(message: types.Message):
         await message.answer("❌ Это не TikTok ссылка")
         return
 
-    await message.answer("📥 Скачиваю видео и музыку...")
+    await message.answer("📥 Скачиваю...")
 
     base = f"{message.from_user.id}_{int(time.time())}"
     video_file = base + ".mp4"
@@ -94,27 +116,36 @@ async def handler(message: types.Message):
         async with semaphore:
             loop = asyncio.get_event_loop()
 
-            # 📹 видео
+            # 📹 VIDEO
             await loop.run_in_executor(
                 executor,
-                download_video_sync,
+                download_video,
                 url,
                 video_file
             )
 
-            # 🎵 музыка (из этого же видео)
+            # 🎵 AUDIO
             await loop.run_in_executor(
                 executor,
-                download_audio_sync,
+                download_audio,
                 url,
                 base
             )
 
-        video = types.FSInputFile(video_file)
-        audio = types.FSInputFile(audio_file)
+        # ⏳ защита от Render lag
+        if not wait_file(video_file):
+            await message.answer("❌ Видео не скачалось")
+            return
 
+        if not wait_file(audio_file):
+            await message.answer("⚠️ Музыка не найдена")
+
+        video = FSInputFile(video_file)
+        audio = FSInputFile(audio_file)
+
+        await asyncio.sleep(1)
         await message.answer_video(video, caption="📹 Видео готово")
-        await message.answer_audio(audio, caption="🎵 Музыка из видео")
+        await message.answer_audio(audio, caption="🎵 Музыка")
 
     except Exception as e:
         await message.answer(f"❌ Ошибка:\n{e}")
