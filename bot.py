@@ -12,7 +12,7 @@ from aiogram.types import FSInputFile
 
 import yt_dlp
 
-# ---------------- WEB SERVER (Render) ----------------
+# ---------------- WEB SERVER ----------------
 
 app = Flask(__name__)
 
@@ -36,9 +36,9 @@ executor = ThreadPoolExecutor(max_workers=3)
 semaphore = asyncio.Semaphore(2)
 
 
-# ---------------- WAIT FILE ----------------
+# ---------------- FILE CHECK ----------------
 
-def wait_file(path, timeout=25):
+def wait_file(path, timeout=30):
     start = time.time()
     while time.time() - start < timeout:
         if os.path.exists(path) and os.path.getsize(path) > 0:
@@ -47,36 +47,75 @@ def wait_file(path, timeout=25):
     return False
 
 
-# ---------------- DOWNLOAD VIDEO ----------------
+# ---------------- AGGRESSIVE DOWNLOAD VIDEO ----------------
 
 def download_video_sync(url, filename):
-    ydl_opts = {
-        "outtmpl": filename,
-        "format": "best[ext=mp4]/best",
-        "noplaylist": True,
-        "quiet": True,
-        "retries": 15,
-        "socket_timeout": 40,
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Referer": "https://www.tiktok.com/",
+    import yt_dlp
+
+    options = [
+        {
+            "outtmpl": filename,
+            "format": "best[ext=mp4]/best",
+            "noplaylist": True,
+            "quiet": False,
+            "retries": 5,
+            "socket_timeout": 30,
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0",
+                "Referer": "https://www.tiktok.com/",
+            },
         },
-    }
+        {
+            "outtmpl": filename,
+            "format": "best",
+            "noplaylist": True,
+            "quiet": False,
+            "retries": 10,
+            "socket_timeout": 60,
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Referer": "https://www.tiktok.com/",
+            },
+        },
+        {
+            "outtmpl": filename,
+            "format": "mp4/best",
+            "noplaylist": True,
+            "quiet": False,
+            "retries": 15,
+            "socket_timeout": 90,
+        }
+    ]
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    last_error = None
+
+    for i, opt in enumerate(options):
+        try:
+            print(f"TRY VIDEO {i+1}")
+
+            with yt_dlp.YoutubeDL(opt) as ydl:
+                ydl.download([url])
+
+            if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                return True
+
+        except Exception as e:
+            last_error = e
+            print("ERROR:", e)
+
+    raise Exception(f"Video download failed: {last_error}")
 
 
-# ---------------- DOWNLOAD AUDIO ----------------
+# ---------------- AUDIO ----------------
 
 def download_audio_sync(url, filename_base):
     ydl_opts = {
         "outtmpl": filename_base,
         "format": "bestaudio/best",
         "noplaylist": True,
-        "quiet": True,
-        "retries": 15,
-        "socket_timeout": 40,
+        "quiet": False,
+        "retries": 10,
+        "socket_timeout": 60,
         "http_headers": {
             "User-Agent": "Mozilla/5.0",
             "Referer": "https://www.tiktok.com/",
@@ -98,12 +137,11 @@ def download_audio_sync(url, filename_base):
 async def start(message: types.Message):
     await message.answer(
         "👋 Отправь TikTok ссылку\n\n"
-        "📹 Я скачаю видео\n"
-        "🎵 и отдельно музыку"
+        "📹 Видео + 🎵 музыка"
     )
 
 
-# ---------------- MAIN HANDLER ----------------
+# ---------------- HANDLER ----------------
 
 @dp.message()
 async def handler(message: types.Message):
@@ -114,7 +152,7 @@ async def handler(message: types.Message):
         await message.answer("❌ Это не TikTok ссылка")
         return
 
-    await message.answer("📥 Скачиваю...")
+    await message.answer("📥 Пытаюсь скачать...")
 
     base = f"{message.from_user.id}_{int(time.time())}"
     video_file = base + ".mp4"
@@ -142,19 +180,18 @@ async def handler(message: types.Message):
                 base
             )
 
-        # CHECK FILES
+        # CHECK
         if not wait_file(video_file):
-            await message.answer("❌ Видео не скачалось (TikTok блок или ссылка)")
+            await message.answer("❌ Видео не скачалось (TikTok блок / приват / регион)")
             return
 
         video = FSInputFile(video_file)
-        audio = FSInputFile(audio_file)
 
         await asyncio.sleep(1)
-
-        await message.answer_video(video, caption="📹 Видео готово")
+        await message.answer_video(video, caption="📹 Готово")
 
         if os.path.exists(audio_file):
+            audio = FSInputFile(audio_file)
             await message.answer_audio(audio, caption="🎵 Музыка")
 
     except Exception as e:
@@ -169,7 +206,7 @@ async def handler(message: types.Message):
 # ---------------- MAIN ----------------
 
 async def main():
-    print("Bot started")
+    print("BOT STARTED")
     await dp.start_polling(bot)
 
 
