@@ -6,7 +6,7 @@ from telethon.tl.custom import Button
 
 API_ID = 39163151
 API_HASH = '3c0e92ad7b268eca1eb1a33a9baa7d1d'
-BOT_TOKEN = '8843874255:AAHVW6-fRx1WbnzdzxP6fnyZT95UjbV8VQ8'
+BOT_TOKEN = '8972832124:AAGXbtjzDshTq3NA2JJIiThRkZ4d9bosi3I'
 
 SESSION_DIR = "sessions"
 if not os.path.exists(SESSION_DIR):
