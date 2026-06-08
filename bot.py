@@ -5,10 +5,9 @@ from telethon.errors import FloodWaitError
 
 API_ID = 39163151
 API_HASH = '3c0e92ad7b268eca1eb1a33a9baa7d1d'
-SESSION_NAME = 'my_account'
+SESSION_NAME = 'my_session'
 PREFIX = '.'
 
-# ========== ВСЕ ОСКОРБЛЕНИЯ ==========
 insults = [
     "я твою мать ебал",
     "я твою мать ебал в жопу",
